@@ -86,6 +86,7 @@ function syncDependentSettingStates() {
     setDependentState("useHA", "ha-details");
     setDependentState("debugLogs", "debug-details");
     setDependentState("discogsEnabled", "discogs-details");
+    setDependentState("vinylAutoWakeEnabled", "vinyl-auto-wake-details");
     setDependentState("vinylAutoSleepEnabled", "vinyl-auto-sleep-details");
     setDependentState("spotifyAutoSleepEnabled", "spotify-auto-sleep-details");
     setDependentState("pickupUsageEnabled", "pickup-usage-details");
@@ -897,6 +898,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "useHA",
     "debugLogs",
     "discogsEnabled",
+    "vinylAutoWakeEnabled",
     "vinylAutoSleepEnabled",
     "spotifyAutoSleepEnabled",
     "pickupUsageEnabled",
@@ -1051,6 +1053,12 @@ async function loadConfig() {
     // BEHAVIOR
     document.getElementById("behaviorLoopDelay").value =
         behavior.loop_delay_seconds ?? 1;
+    document.getElementById("vinylAutoWakeEnabled").checked =
+        behavior.vinyl_auto_wake_enabled !== false;
+    document.getElementById("vinylAutoWakeThreshold").value =
+        behavior.vinyl_auto_wake_threshold_dbfs ?? pickupUsage.start_threshold_dbfs ?? -48;
+    document.getElementById("vinylAutoWakeConfirmSeconds").value =
+        behavior.vinyl_auto_wake_confirm_seconds ?? 2;
     document.getElementById("vinylAutoSleepEnabled").checked =
         behavior.vinyl_auto_sleep_enabled !== false;
     document.getElementById("vinylAutoSleepIterations").value =
@@ -1142,7 +1150,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         : -48;
     pickupUsage.stop_threshold_dbfs = Number.isFinite(pickupStopThreshold)
         ? pickupStopThreshold
-        : -55;
+        : -61;
     pickupUsage.start_confirm_seconds = Math.max(0.1,
         parseFloat(document.getElementById("pickupStartConfirmSeconds").value) || 3);
     pickupUsage.stop_confirm_seconds = Math.max(0.1,
@@ -1243,6 +1251,16 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     // BEHAVIOR
     behavior.loop_delay_seconds =
         parseFloat(document.getElementById("behaviorLoopDelay").value) || 1;
+    behavior.vinyl_auto_wake_enabled =
+        document.getElementById("vinylAutoWakeEnabled").checked;
+    behavior.vinyl_auto_wake_threshold_dbfs = Math.min(
+        -1,
+        Math.max(-100, parseFloat(document.getElementById("vinylAutoWakeThreshold").value) || -48),
+    );
+    behavior.vinyl_auto_wake_confirm_seconds = Math.min(
+        30,
+        Math.max(0.1, parseFloat(document.getElementById("vinylAutoWakeConfirmSeconds").value) || 2),
+    );
     behavior.vinyl_auto_sleep_enabled =
         document.getElementById("vinylAutoSleepEnabled").checked;
     behavior.vinyl_auto_sleep_iterations = Math.max(

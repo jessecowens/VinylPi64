@@ -25,7 +25,7 @@ class AudioLevel:
 class PickupUsageConfig:
     enabled: bool = True
     start_threshold_dbfs: float = -48.0
-    stop_threshold_dbfs: float = -55.0
+    stop_threshold_dbfs: float = -61.0
     start_confirm_seconds: float = 3.0
     stop_confirm_seconds: float = 30.0
 
@@ -42,7 +42,7 @@ class PickupUsageConfig:
             return max(minimum, min(maximum, value))
 
         start_threshold = number("start_threshold_dbfs", -48.0, -100.0, -1.0)
-        stop_threshold = number("stop_threshold_dbfs", -55.0, -120.0, -1.0)
+        stop_threshold = number("stop_threshold_dbfs", -61.0, -120.0, -1.0)
         # Hysteresis requires the start threshold to be louder (numerically
         # higher) than the stop threshold. Keep at least 1 dB between them.
         if stop_threshold >= start_threshold:

@@ -92,6 +92,9 @@ CONFIG_DEFAULTS = {
     },
     "behavior": {
         "loop_delay_seconds": 1,
+        "vinyl_auto_wake_enabled": True,
+        "vinyl_auto_wake_threshold_dbfs": -48.0,
+        "vinyl_auto_wake_confirm_seconds": 2.0,
         "vinyl_auto_sleep_enabled": True,
         "vinyl_auto_sleep_iterations": 30,
         "stats_min_consecutive": 3
