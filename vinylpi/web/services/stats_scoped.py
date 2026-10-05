@@ -86,6 +86,7 @@ def get_scoped_stats(scope: str = "vinyl", *, limit: int = 10) -> dict[str, Any]
         "radar_genres": genres[:6],
         "total_minutes_listened": int(vinyl.get("total_minutes_listened") or 0)
         + int(spotify.get("total_minutes_listened") or 0),
+        "pickup_usage_seconds": float(vinyl.get("pickup_usage_seconds") or 0.0),
         "album_count_unit": "listen",
         "metadata_coverage": {
             "songs_total": int(coverage_v.get("songs_total") or 0) + int(coverage_s.get("songs_total") or 0),

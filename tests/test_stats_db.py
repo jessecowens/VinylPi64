@@ -40,6 +40,7 @@ class StatsDatabaseTests(unittest.TestCase):
 
         self.assertIn("songs", tables)
         self.assertIn("current_status", tables)
+        self.assertIn("pickup_usage_totals", tables)
         self.assertEqual(version, str(database.SCHEMA_VERSION))
 
     def test_song_artist_album_and_genre_statistics_round_trip(self):
@@ -56,6 +57,7 @@ class StatsDatabaseTests(unittest.TestCase):
         stats_db.update_song_stats("Artist", "Song", "Album")
         stats_db.increment_album_session("Album")
         stats_db.add_listening_seconds(180)
+        stats_db.add_pickup_usage_seconds(3661.5)
 
         ranked = stats_db.get_ranked_stats(limit=10)
 
@@ -64,6 +66,7 @@ class StatsDatabaseTests(unittest.TestCase):
         self.assertEqual(ranked["top_albums"][0], {"name": "Album", "count": 1})
         self.assertEqual(ranked["top_genres"][0], {"name": "Rock", "count": 2})
         self.assertEqual(ranked["total_minutes_listened"], 3)
+        self.assertAlmostEqual(ranked["pickup_usage_seconds"], 3661.5)
         self.assertEqual(ranked["metadata_coverage"]["songs_with_shazam_id"], 1)
 
     def test_duration_cache_round_trip_is_case_insensitive(self):

@@ -15,6 +15,13 @@ CONFIG_DEFAULTS = {
         "adaptive_sample": {
             "enabled": False,
             "failure_durations_seconds": [6, 8]
+        },
+        "pickup_usage": {
+            "enabled": True,
+            "start_threshold_dbfs": -48.0,
+            "stop_threshold_dbfs": -55.0,
+            "start_confirm_seconds": 3.0,
+            "stop_confirm_seconds": 30.0
         }
     },
     "image": {

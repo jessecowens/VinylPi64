@@ -138,6 +138,37 @@
     font-size: 13px;
 }
 
+.stats-pickup-usage {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    align-items: baseline;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.stats-pickup-label {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 760;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+#stats-pickup-usage {
+    justify-self: end;
+    color: var(--yellow);
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.stats-pickup-note {
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: 12px;
+}
+
 .stats-kicker,
 .eyebrow {
     font-weight: 720;

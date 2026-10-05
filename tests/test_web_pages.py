@@ -124,6 +124,11 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertIn('id="spotifyAutoSleepIterations"', html)
         self.assertIn('id="vinylAutoSleepEnabled"', html)
         self.assertIn('id="vinylAutoSleepIterations"', html)
+        self.assertIn('id="pickupUsageEnabled"', html)
+        self.assertIn('id="pickupStartThreshold"', html)
+        self.assertIn('id="pickupStopThreshold"', html)
+        self.assertIn('id="pickupStartConfirmSeconds"', html)
+        self.assertIn('id="pickupStopConfirmSeconds"', html)
         self.assertIn('Profile account connection', html)
         self.assertNotIn('Choose a category', html)
         self.assertNotIn('Open only the settings you need', html)
@@ -133,6 +138,8 @@ class WebPageStructureTests(unittest.TestCase):
         html = response.get_data(as_text=True)
 
         self.assertIn('id="stats-share-button"', html)
+        self.assertIn('id="stats-pickup-usage"', html)
+        self.assertIn('Pickup usage', html)
         self.assertIn('Share', html)
 
 

@@ -34,12 +34,17 @@ function updateStatsScopeUI() {
 
     const sharePanel = document.getElementById("stats-share-panel");
     if (sharePanel) sharePanel.classList.toggle("hidden", vinylPiStatsScope !== "vinyl");
+
+    const pickupUsageRow = document.getElementById("stats-pickup-usage-row");
+    if (pickupUsageRow) pickupUsageRow.classList.toggle("hidden", vinylPiStatsScope !== "vinyl");
 }
 
 renderStats = function renderScopedStats(data = {}) {
     const minutes = Number(data.total_minutes_listened) || 0;
     const minutesElement = document.getElementById("stats-minutes");
     if (minutesElement) minutesElement.textContent = Math.round(minutes).toLocaleString();
+    const pickupUsage = document.getElementById("stats-pickup-usage");
+    if (pickupUsage) pickupUsage.textContent = formatPickupDuration(data.pickup_usage_seconds);
 
     const songs = Array.isArray(data.top_songs) ? data.top_songs : [];
     const artists = Array.isArray(data.top_artists) ? data.top_artists : [];

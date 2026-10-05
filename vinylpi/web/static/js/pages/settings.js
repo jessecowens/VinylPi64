@@ -88,6 +88,7 @@ function syncDependentSettingStates() {
     setDependentState("discogsEnabled", "discogs-details");
     setDependentState("vinylAutoSleepEnabled", "vinyl-auto-sleep-details");
     setDependentState("spotifyAutoSleepEnabled", "spotify-auto-sleep-details");
+    setDependentState("pickupUsageEnabled", "pickup-usage-details");
 }
 
 function setSelectedImagePath(inputId, pathId, path) {
@@ -898,6 +899,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "discogsEnabled",
     "vinylAutoSleepEnabled",
     "spotifyAutoSleepEnabled",
+    "pickupUsageEnabled",
   ].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", syncDependentSettingStates);
   });
@@ -945,6 +947,17 @@ async function loadConfig() {
         adaptiveDurations[0] ?? 6;
     document.getElementById("adaptiveSampleLaterFailures").value =
         adaptiveDurations[1] ?? adaptiveDurations[0] ?? 8;
+    const pickupUsage = audio.pickup_usage || {};
+    document.getElementById("pickupUsageEnabled").checked =
+        pickupUsage.enabled !== false;
+    document.getElementById("pickupStartThreshold").value =
+        pickupUsage.start_threshold_dbfs ?? -48;
+    document.getElementById("pickupStopThreshold").value =
+        pickupUsage.stop_threshold_dbfs ?? -55;
+    document.getElementById("pickupStartConfirmSeconds").value =
+        pickupUsage.start_confirm_seconds ?? 3;
+    document.getElementById("pickupStopConfirmSeconds").value =
+        pickupUsage.stop_confirm_seconds ?? 30;
     syncAdaptiveSampleState();
 
     // IMAGE / DISPLAY
@@ -1074,6 +1087,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
 
     cfg.audio = cfg.audio || {};
     cfg.audio.adaptive_sample = cfg.audio.adaptive_sample || {};
+    cfg.audio.pickup_usage = cfg.audio.pickup_usage || {};
     cfg.image = cfg.image || {};
     cfg.fallback = cfg.fallback || {};
     cfg.divoom = cfg.divoom || {};
@@ -1087,6 +1101,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
 
     const audio = cfg.audio;
     const adaptiveSample = cfg.audio.adaptive_sample;
+    const pickupUsage = cfg.audio.pickup_usage;
     const image = cfg.image;
     const fallback = cfg.fallback;
     const divoom = cfg.divoom;
@@ -1113,6 +1128,25 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         Math.max(0.5, parseFloat(document.getElementById("adaptiveSampleFirstFailure").value) || 6),
         Math.max(0.5, parseFloat(document.getElementById("adaptiveSampleLaterFailures").value) || 8),
     ];
+
+    const pickupStartThreshold = parseFloat(document.getElementById("pickupStartThreshold").value);
+    const pickupStopThreshold = parseFloat(document.getElementById("pickupStopThreshold").value);
+    if (Number.isFinite(pickupStartThreshold) && Number.isFinite(pickupStopThreshold)
+        && pickupStartThreshold <= pickupStopThreshold) {
+        showToast("Pickup start threshold must be louder than the stop threshold.", true);
+        return;
+    }
+    pickupUsage.enabled = document.getElementById("pickupUsageEnabled").checked;
+    pickupUsage.start_threshold_dbfs = Number.isFinite(pickupStartThreshold)
+        ? pickupStartThreshold
+        : -48;
+    pickupUsage.stop_threshold_dbfs = Number.isFinite(pickupStopThreshold)
+        ? pickupStopThreshold
+        : -55;
+    pickupUsage.start_confirm_seconds = Math.max(0.1,
+        parseFloat(document.getElementById("pickupStartConfirmSeconds").value) || 3);
+    pickupUsage.stop_confirm_seconds = Math.max(0.1,
+        parseFloat(document.getElementById("pickupStopConfirmSeconds").value) || 30);
 
     // IMAGE / DISPLAY
     const fittedDisplay = syncDisplayDesigner();

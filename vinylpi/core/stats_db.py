@@ -196,6 +196,33 @@ def add_listening_seconds(seconds: float) -> float:
     return float(row["total_seconds"] or 0.0)
 
 
+def add_pickup_usage_seconds(seconds: float) -> float:
+    seconds = max(0.0, float(seconds))
+    init_db()
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE pickup_usage_totals
+            SET total_seconds = total_seconds + ?, updated_at = strftime('%s', 'now')
+            WHERE id = 1
+            """,
+            (seconds,),
+        )
+        row = conn.execute(
+            "SELECT total_seconds FROM pickup_usage_totals WHERE id = 1"
+        ).fetchone()
+    return float(row["total_seconds"] or 0.0)
+
+
+def get_pickup_usage_seconds() -> float:
+    init_db()
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT total_seconds FROM pickup_usage_totals WHERE id = 1"
+        ).fetchone()
+    return float((row["total_seconds"] if row else 0.0) or 0.0)
+
+
 def update_song_duration(
     artist: str,
     title: str,
@@ -526,6 +553,7 @@ def get_stats_snapshot() -> dict:
         "artists": {},
         "albums": {},
         "listening": {"total_seconds": 0.0},
+        "pickup_usage": {"total_seconds": 0.0},
         "durations_cache": {},
         "album_covers": {},
         "tag_cache": {},
@@ -589,6 +617,12 @@ def get_stats_snapshot() -> dict:
             stats["listening"]["recalculated_from_song_counts"] = bool(
                 row["recalculated_from_song_counts"]
             )
+
+        pickup_row = conn.execute(
+            "SELECT total_seconds FROM pickup_usage_totals WHERE id = 1"
+        ).fetchone()
+        if pickup_row:
+            stats["pickup_usage"]["total_seconds"] = float(pickup_row["total_seconds"] or 0.0)
 
         for row in conn.execute(
             """
@@ -751,6 +785,9 @@ def get_ranked_stats(limit: int = 10) -> dict[str, Any]:
         listening = conn.execute(
             "SELECT total_seconds FROM listening_totals WHERE id = 1"
         ).fetchone()
+        pickup_usage = conn.execute(
+            "SELECT total_seconds FROM pickup_usage_totals WHERE id = 1"
+        ).fetchone()
 
         metadata = conn.execute(
             """
@@ -763,6 +800,7 @@ def get_ranked_stats(limit: int = 10) -> dict[str, Any]:
         ).fetchone()
 
     total_seconds = float((listening["total_seconds"] if listening else 0.0) or 0.0)
+    pickup_seconds = float((pickup_usage["total_seconds"] if pickup_usage else 0.0) or 0.0)
     return {
         "top_songs": top_songs,
         "top_artists": top_artists,
@@ -771,6 +809,7 @@ def get_ranked_stats(limit: int = 10) -> dict[str, Any]:
         "top_genres": top_genres,
         "radar_genres": top_genres[:6],
         "total_minutes_listened": int(round(total_seconds / 60.0)),
+        "pickup_usage_seconds": pickup_seconds,
         "metadata_coverage": {
             "songs_total": int(metadata["songs_total"] or 0),
             "songs_with_genre": int(metadata["songs_with_genre"] or 0),
@@ -798,6 +837,7 @@ def import_stats_json(
     artists = stats.get("artists") or {}
     albums = stats.get("albums") or {}
     listening = stats.get("listening") or {}
+    pickup_usage = stats.get("pickup_usage") or {}
     durations = stats.get("durations_cache") or {}
     album_covers = stats.get("album_covers") or {}
     tags = stats.get("tag_cache") or {}
@@ -816,6 +856,8 @@ def import_stats_json(
                 UPDATE listening_totals SET total_seconds = 0,
                     recalculated_at = NULL,
                     recalculated_from_song_counts = 0,
+                    updated_at = strftime('%s', 'now') WHERE id = 1;
+                UPDATE pickup_usage_totals SET total_seconds = 0,
                     updated_at = strftime('%s', 'now') WHERE id = 1;
                 """
             )
@@ -912,6 +954,16 @@ def import_stats_json(
                 _as_int(listening.get("recalculated_at")),
                 1 if listening.get("recalculated_from_song_counts") else 0,
             ),
+        )
+
+        conn.execute(
+            """
+            UPDATE pickup_usage_totals SET
+                total_seconds = ?,
+                updated_at = strftime('%s', 'now')
+            WHERE id = 1
+            """,
+            (_as_float(pickup_usage.get("total_seconds"), 0.0),),
         )
 
         for cache_key, item in durations.items():
@@ -1017,6 +1069,7 @@ def import_stats_json(
         "album_covers": len(album_covers),
         "tag_cache": len(tags),
         "total_seconds": float(listening.get("total_seconds") or 0.0),
+        "pickup_usage_seconds": float(pickup_usage.get("total_seconds") or 0.0),
         "sha256": digest,
     }
 

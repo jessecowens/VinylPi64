@@ -26,6 +26,7 @@ def _empty_stats_payload() -> dict[str, Any]:
         "top_genres": [],
         "radar_genres": [],
         "total_minutes_listened": 0,
+        "pickup_usage_seconds": 0.0,
         "metadata_coverage": {
             "songs_total": 0,
             "songs_with_genre": 0,

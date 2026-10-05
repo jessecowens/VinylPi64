@@ -4,6 +4,7 @@ import time
 
 from vinylpi.config.config_watcher import maybe_log_config_reload
 from vinylpi.core.audio_capture import record_sample
+from vinylpi.core.pickup_usage import PickupUsageConfig, PickupUsageTracker, measure_wav_level
 from vinylpi.core.display_refresh import start_display_refresh_watcher
 from vinylpi.core.discogs_matcher import (
     apply_discogs_match,
@@ -34,6 +35,7 @@ from vinylpi.core.loop_state import (
 )
 from vinylpi.core.recognition import recognize_song
 from vinylpi.core.storage import initialize_storage
+from vinylpi.core.stats_db import add_pickup_usage_seconds
 from vinylpi.core.title_variants import is_live_variant
 from vinylpi.config.runtime import read_config
 
@@ -44,7 +46,9 @@ MIN_CONSECUTIVE_FOR_ALBUM_SWITCH = 2
 
 def main_loop() -> None:
     initialize_storage()
-    cfg = LoopConfig.from_config(read_config())
+    raw_cfg = read_config()
+    cfg = LoopConfig.from_config(raw_cfg)
+    pickup_tracker = PickupUsageTracker(PickupUsageConfig.from_config(raw_cfg))
     if cfg.debug_log:
         print(f"\nStarting VinylPi64 recognition loop (every {cfg.delay}s)\n")
 
@@ -61,6 +65,7 @@ def main_loop() -> None:
             cfg_reloaded = maybe_log_config_reload()
             raw_cfg = read_config()
             cfg = LoopConfig.from_config(raw_cfg)
+            pickup_tracker.configure(PickupUsageConfig.from_config(raw_cfg))
 
             sample_seconds = cfg.sample_seconds_for_failures(display_state.consecutive_failures)
             if cfg.debug_log:
@@ -71,6 +76,23 @@ def main_loop() -> None:
                 print("No recording possible, trying again in 5s ...")
                 time.sleep(5)
                 continue
+
+            if pickup_tracker.config.enabled:
+                level = measure_wav_level(wav_bytes)
+                if level is not None:
+                    was_active = pickup_tracker.active
+                    pickup_delta = pickup_tracker.observe(
+                        level.dbfs,
+                        level.duration_seconds,
+                    )
+                    if pickup_delta > 0:
+                        add_pickup_usage_seconds(pickup_delta)
+                    if cfg.debug_log:
+                        state = "active" if pickup_tracker.active else "inactive"
+                        print(f"Pickup input level: {level.dbfs:.1f} dBFS ({state})")
+                        if pickup_tracker.active != was_active:
+                            transition = "started" if pickup_tracker.active else "stopped"
+                            print(f"Pickup usage tracking {transition}.")
 
             track = recognize_song(wav_bytes)
             if track is None:

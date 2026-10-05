@@ -10,6 +10,16 @@ function formatCount(value, singular, plural = `${singular}s`) {
     return `${count} ${count === 1 ? singular : plural}`;
 }
 
+function formatPickupDuration(value) {
+    const totalSeconds = Math.max(0, Math.round(Number(value) || 0));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    if (hours > 0) {
+        return `${hours.toLocaleString()} h ${minutes} min`;
+    }
+    return `${minutes} min`;
+}
+
 function createEmptyItem(message) {
     const item = document.createElement("li");
     item.className = "stats-empty";
@@ -396,6 +406,8 @@ function updateAlbumCarousel() {
 function renderStats(data) {
     const minutes = Number(data.total_minutes_listened) || 0;
     document.getElementById("stats-minutes").textContent = Math.round(minutes).toLocaleString();
+    const pickupUsage = document.getElementById("stats-pickup-usage");
+    if (pickupUsage) pickupUsage.textContent = formatPickupDuration(data.pickup_usage_seconds);
 
     const songs = Array.isArray(data.top_songs) ? data.top_songs : [];
     const artists = Array.isArray(data.top_artists) ? data.top_artists : [];

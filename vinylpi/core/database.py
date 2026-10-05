@@ -8,7 +8,7 @@ from vinylpi.paths import DB_PATH, get_active_db_path
 
 _LEGACY_DB_PATH = DB_PATH
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 _INIT_LOCK = threading.Lock()
 _INITIALIZED_PATHS: set[str] = set()
 
@@ -89,6 +89,12 @@ def _create_schema(conn: sqlite3.Connection) -> None:
             total_seconds REAL NOT NULL DEFAULT 0,
             recalculated_at INTEGER,
             recalculated_from_song_counts INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS pickup_usage_totals (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            total_seconds REAL NOT NULL DEFAULT 0,
             updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
         );
 
@@ -239,6 +245,9 @@ def _create_schema(conn: sqlite3.Connection) -> None:
 
         INSERT OR IGNORE INTO listening_totals (id, total_seconds)
         VALUES (1, 0);
+
+        INSERT OR IGNORE INTO pickup_usage_totals (id, total_seconds)
+        VALUES (1, 0);
         """
     )
 
@@ -285,6 +294,14 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
 
     conn.executescript(
         """
+        CREATE TABLE IF NOT EXISTS pickup_usage_totals (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            total_seconds REAL NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        INSERT OR IGNORE INTO pickup_usage_totals (id, total_seconds) VALUES (1, 0);
+
         CREATE TABLE IF NOT EXISTS discogs_releases (
             release_id INTEGER PRIMARY KEY,
             instance_id INTEGER,
@@ -395,7 +412,8 @@ def database_has_statistics(db_path: Path | str | None = None) -> bool:
                 (SELECT COUNT(*) FROM songs) AS songs,
                 (SELECT COUNT(*) FROM artist_totals) AS artists,
                 (SELECT COUNT(*) FROM album_sessions) AS albums,
-                (SELECT total_seconds FROM listening_totals WHERE id = 1) AS total_seconds
+                (SELECT total_seconds FROM listening_totals WHERE id = 1) AS total_seconds,
+                (SELECT total_seconds FROM pickup_usage_totals WHERE id = 1) AS pickup_seconds
             """
         ).fetchone()
     return bool(
@@ -405,5 +423,6 @@ def database_has_statistics(db_path: Path | str | None = None) -> bool:
             or int(row["artists"] or 0) > 0
             or int(row["albums"] or 0) > 0
             or float(row["total_seconds"] or 0.0) > 0.0
+            or float(row["pickup_seconds"] or 0.0) > 0.0
         )
     )
