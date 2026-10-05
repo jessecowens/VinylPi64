@@ -4,7 +4,6 @@ import time
 
 from vinylpi.config.config_watcher import maybe_log_config_reload
 from vinylpi.core.audio_capture import record_sample
-from vinylpi.core.audio_wake import VinylAutoWakeConfig, wait_for_audio_wake
 from vinylpi.core.pickup_usage import PickupUsageConfig, PickupUsageTracker, measure_wav_level
 from vinylpi.core.display_refresh import start_display_refresh_watcher
 from vinylpi.core.discogs_matcher import (
@@ -42,7 +41,6 @@ from vinylpi.config.runtime import read_config
 
 MIN_TRACKS_FOR_ALBUM_SESSION = 2
 MIN_CONSECUTIVE_FOR_ALBUM_SWITCH = 2
-_PICKUP_MONITOR_FLUSH_SECONDS = 30.0
 
 
 def _observe_pickup_level(
@@ -74,72 +72,6 @@ def _observe_pickup_level(
     return pickup_delta
 
 
-def _wait_for_auto_wake_with_pickup(
-    pickup_tracker: PickupUsageTracker,
-    *,
-    require_rearm: bool,
-):
-    pending_pickup_seconds = 0.0
-    last_flush_at = time.monotonic()
-
-    def on_level(level_dbfs: float, duration_seconds: float, raw_cfg: dict) -> None:
-        nonlocal pending_pickup_seconds, last_flush_at
-        pending_pickup_seconds += _observe_pickup_level(
-            pickup_tracker,
-            raw_cfg,
-            level_dbfs,
-            duration_seconds,
-            persist=False,
-            log_level=False,
-        )
-
-        now = time.monotonic()
-        if pending_pickup_seconds > 0 and now - last_flush_at >= _PICKUP_MONITOR_FLUSH_SECONDS:
-            add_pickup_usage_seconds(pending_pickup_seconds)
-            pending_pickup_seconds = 0.0
-            last_flush_at = now
-
-    event = wait_for_audio_wake(
-        require_rearm=require_rearm,
-        level_callback=on_level,
-    )
-    if pending_pickup_seconds > 0:
-        add_pickup_usage_seconds(pending_pickup_seconds)
-    return event
-
-
-def _sleep_or_wait_for_auto_wake(
-    pickup_tracker: PickupUsageTracker,
-    display_state: DisplayState,
-    *,
-    debug_log: bool,
-) -> bool:
-    """Return True when the recognizer worker should exit after auto sleep."""
-    latest_cfg = read_config()
-    auto_wake_cfg = VinylAutoWakeConfig.from_config(latest_cfg)
-    if not auto_wake_cfg.enabled:
-        return True
-
-    if debug_log:
-        print(
-            "Shazam recognition suspended; switching to the "
-            "low-power audio monitor."
-        )
-    wake_event = _wait_for_auto_wake_with_pickup(
-        pickup_tracker,
-        require_rearm=True,
-    )
-    if wake_event is None:
-        # Auto wake was disabled while sleeping. Preserve the existing
-        # auto-sleep behavior and stop the worker.
-        return True
-
-    display_state.consecutive_failures = 0
-    if debug_log:
-        print("Audio activity detected; resuming Vinyl recognition.")
-    return False
-
-
 def main_loop() -> None:
     initialize_storage()
     raw_cfg = read_config()
@@ -147,22 +79,6 @@ def main_loop() -> None:
     pickup_tracker = PickupUsageTracker(PickupUsageConfig.from_config(raw_cfg))
     if cfg.debug_log:
         print(f"\nStarting VinylPi64 recognition loop (every {cfg.delay}s)\n")
-
-    auto_wake_cfg = VinylAutoWakeConfig.from_config(raw_cfg)
-    if auto_wake_cfg.enabled:
-        if cfg.debug_log:
-            print(
-                "Vinyl auto wake is enabled; Shazam stays asleep until the "
-                f"input reaches {auto_wake_cfg.threshold_dbfs:.1f} dBFS."
-            )
-        # Initial Vinyl activation is allowed to wake from an already-active
-        # signal. If auto wake is disabled from Settings while waiting, the
-        # selected Vinyl mode falls back to the normal immediate-recognition
-        # behavior instead of exiting.
-        _wait_for_auto_wake_with_pickup(
-            pickup_tracker,
-            require_rearm=False,
-        )
 
     display_state = DisplayState()
     album_state = AlbumState()
@@ -240,13 +156,9 @@ def main_loop() -> None:
                     cfg_reloaded,
                     side_flip_prompt=side_flip_prompt,
                 ):
-                    if _sleep_or_wait_for_auto_wake(
-                        pickup_tracker,
-                        display_state,
-                        debug_log=cfg.debug_log,
-                    ):
-                        break
-                    continue
+                    if cfg.debug_log:
+                        print("Vinyl auto-sleep reached; stopping recognition worker.")
+                    break
                 time.sleep(cfg.delay)
                 continue
 
@@ -286,13 +198,9 @@ def main_loop() -> None:
                         cfg_reloaded,
                         side_flip_prompt=side_flip_prompt,
                     ):
-                        if _sleep_or_wait_for_auto_wake(
-                            pickup_tracker,
-                            display_state,
-                            debug_log=cfg.debug_log,
-                        ):
-                            break
-                        continue
+                        if cfg.debug_log:
+                            print("Vinyl auto-sleep reached; stopping recognition worker.")
+                        break
                     time.sleep(cfg.delay)
                     continue
 

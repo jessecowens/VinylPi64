@@ -125,7 +125,7 @@ class SourceMutexTests(unittest.TestCase):
         spotify_stop.assert_called_once_with()
         recognizer_stop.assert_called_once_with()
         show_fallback.assert_called_once_with()
-        set_runtime_profile.assert_called_once_with(None)
+        set_runtime_profile.assert_called_once_with("simon")
 
     @patch("vinylpi.web.services.source.get_status", return_value={"mode": "spotify"})
     @patch("vinylpi.web.services.source.spotify.start", return_value=True)

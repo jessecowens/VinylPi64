@@ -19,7 +19,7 @@ from vinylpi.profiles import (
     prepare_profile_avatar,
     update_profile,
 )
-from vinylpi.web.services.source import get_mode, set_mode
+from vinylpi.web.services.source import get_mode, select_idle_profile, set_mode
 
 profiles_bp = Blueprint("profiles_api", __name__)
 
@@ -79,6 +79,8 @@ def api_create_profile():
 
     if activated:
         _set_browser_profile(profile["id"])
+        if get_mode() == "off":
+            select_idle_profile(profile["id"])
 
     return jsonify(
         {
@@ -103,6 +105,8 @@ def api_activate_profile(profile_id: str):
     except ProfilePasswordNotConfiguredError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 409
     _set_browser_profile(profile_id)
+    if get_mode() == "off":
+        select_idle_profile(profile_id)
     return jsonify({"ok": True, "profile": profile, "recognizer_restarted": False})
 
 
@@ -120,6 +124,8 @@ def api_initialize_profile_password(profile_id: str):
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     _set_browser_profile(profile_id)
+    if get_mode() == "off":
+        select_idle_profile(profile_id)
     return jsonify({"ok": True, "profile": profile, "recognizer_restarted": False})
 
 
@@ -139,6 +145,8 @@ def api_logout_profile():
         set_mode("off")
 
     _set_browser_profile(None)
+    if get_mode() == "off":
+        select_idle_profile(None)
     return jsonify(
         {
             "ok": True,

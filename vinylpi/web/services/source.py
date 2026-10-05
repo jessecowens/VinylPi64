@@ -112,8 +112,36 @@ def get_visible_status() -> dict:
 
 
 
+def _claim_idle_profile_for_viewer() -> None:
+    """Keep auto-wake bound to the signed-in profile while playback is Off.
+
+    Older builds cleared the runtime profile on Off. After upgrading, the first
+    signed-in dashboard poll adopts that viewer so the background wake monitor
+    immediately reads the correct per-profile settings/statistics.
+    """
+    if get_mode() != "off":
+        return
+    viewer_key = get_active_storage_key()
+    if viewer_key == "_guest":
+        return
+    runtime = get_runtime_profile()
+    runtime_key = str(runtime.get("storage_key") or "_guest")
+    if runtime_key == "_guest":
+        set_runtime_profile(viewer_key)
+
+
+def select_idle_profile(profile_id: str | None) -> None:
+    """Select which profile owns wake-on-audio while no source is active."""
+    with _lock:
+        if get_mode() != "off":
+            return
+        set_runtime_profile(profile_id)
+
+
 def get_status() -> dict:
     mode = get_mode()
+    if mode == "off":
+        _claim_idle_profile_for_viewer()
     runtime = get_runtime_profile() if mode != "off" else None
     viewer_key = get_active_storage_key()
     runtime_key = str((runtime or {}).get("storage_key") or "")
@@ -127,7 +155,7 @@ def get_status() -> dict:
     }
 
 
-def set_mode(mode: str) -> dict:
+def set_mode(mode: str, *, _from_auto_wake: bool = False) -> dict:
     global _source_mode
     requested = str(mode or "").strip().lower()
     if requested not in _VALID_MODES:
@@ -153,9 +181,13 @@ def set_mode(mode: str) -> dict:
             recognizer.stop()
             show_fallback_image()
             _source_mode = "off"
-            status = get_status()
-            set_runtime_profile(None)
-            return status
+            # Keep the selected profile as the owner of the lightweight idle
+            # monitor. This preserves its wake threshold and ensures an
+            # automatic Vinyl start writes statistics to the same profile.
+            set_runtime_profile(None if viewer_key == "_guest" else viewer_key)
+            from vinylpi.web.services import auto_wake_monitor
+            auto_wake_monitor.resume()
+            return get_status()
 
         if requested == "vinyl":
             # Claim the single physical playback/recognition pipeline for the
@@ -173,11 +205,20 @@ def set_mode(mode: str) -> dict:
             # the fallback image to flicker back to the previous session's
             # cover. Stop the old source, show one static fallback frame, then
             # let the recognizer become the sole Pixoo writer.
-            spotify.stop()
-            show_fallback_image()
-            recognizer.start(silence_output=_debug_silence())
-            _source_mode = "vinyl"
-            return get_status()
+            auto_wake_monitor = None
+            if not _from_auto_wake:
+                from vinylpi.web.services import auto_wake_monitor as wake_service
+                auto_wake_monitor = wake_service
+                auto_wake_monitor.pause_for_source_change()
+            try:
+                spotify.stop()
+                show_fallback_image()
+                recognizer.start(silence_output=_debug_silence())
+                _source_mode = "vinyl"
+                return get_status()
+            finally:
+                if auto_wake_monitor is not None:
+                    auto_wake_monitor.resume()
 
         spotify_status = spotify_env_status()
         if not spotify_status.get("configured"):
@@ -200,11 +241,20 @@ def set_mode(mode: str) -> dict:
 
         if current_mode == "off":
             set_runtime_profile(None if viewer_key == "_guest" else viewer_key)
-        recognizer.stop()
-        # Same rule as Vinyl: remembered Spotify metadata is dashboard-only.
-        # Keep the Pixoo on the fallback until the Spotify worker confirms a
-        # track that is actually playing now.
-        show_fallback_image()
-        spotify.start(silence_output=_debug_silence())
-        _source_mode = "spotify"
-        return get_status()
+        auto_wake_monitor = None
+        if not _from_auto_wake:
+            from vinylpi.web.services import auto_wake_monitor as wake_service
+            auto_wake_monitor = wake_service
+            auto_wake_monitor.pause_for_source_change()
+        try:
+            recognizer.stop()
+            # Same rule as Vinyl: remembered Spotify metadata is dashboard-only.
+            # Keep the Pixoo on the fallback until the Spotify worker confirms a
+            # track that is actually playing now.
+            show_fallback_image()
+            spotify.start(silence_output=_debug_silence())
+            _source_mode = "spotify"
+            return get_status()
+        finally:
+            if auto_wake_monitor is not None:
+                auto_wake_monitor.resume()

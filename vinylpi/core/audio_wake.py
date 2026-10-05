@@ -161,12 +161,14 @@ def wait_for_audio_wake(
     *,
     require_rearm: bool = False,
     level_callback: Callable[[float, float, dict], None] | None = None,
+    should_continue: Callable[[], bool] | None = None,
 ) -> AudioWakeEvent | None:
     """Wait in a low-power PCM monitor until the configured Vinyl wake level.
 
     This deliberately avoids WAV creation and all Shazam/network work. The
-    function blocks inside the recognizer worker while Vinyl mode remains armed.
-    Returning ``None`` means auto wake was disabled while the monitor was active.
+    function blocks in whichever coordinator owns the low-power monitor.
+    Returning ``None`` means auto wake was disabled or the caller asked the
+    monitor to stop while it was active.
     """
     # Keep the hardware dependency lazy so config/state-machine tests can run
     # on development machines without PortAudio/sounddevice installed.
@@ -183,6 +185,9 @@ def wait_for_audio_wake(
     last_armed = tracker.armed
 
     while True:
+        if should_continue is not None and not should_continue():
+            return None
+
         raw_cfg = read_config()
         wake_cfg = VinylAutoWakeConfig.from_config(raw_cfg)
         if not wake_cfg.enabled:
@@ -225,6 +230,9 @@ def wait_for_audio_wake(
                     )
 
                 while True:
+                    if should_continue is not None and not should_continue():
+                        return None
+
                     raw_cfg = read_config()
                     wake_cfg = VinylAutoWakeConfig.from_config(raw_cfg)
                     if not wake_cfg.enabled:
