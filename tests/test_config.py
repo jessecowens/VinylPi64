@@ -43,7 +43,7 @@ class ConfigLoaderTests(unittest.TestCase):
         self.assertEqual(cfg["behavior"]["vinyl_auto_sleep_iterations"], 30)
         self.assertTrue(cfg["audio"]["pickup_usage"]["enabled"])
         self.assertEqual(cfg["audio"]["pickup_usage"]["start_threshold_dbfs"], -48.0)
-        self.assertEqual(cfg["audio"]["pickup_usage"]["stop_threshold_dbfs"], -55.0)
+        self.assertEqual(cfg["audio"]["pickup_usage"]["stop_threshold_dbfs"], -61.0)
         self.assertEqual(cfg["audio"]["pickup_usage"]["start_confirm_seconds"], 3.0)
         self.assertEqual(cfg["audio"]["pickup_usage"]["stop_confirm_seconds"], 30.0)
 

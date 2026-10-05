@@ -953,7 +953,7 @@ async function loadConfig() {
     document.getElementById("pickupStartThreshold").value =
         pickupUsage.start_threshold_dbfs ?? -48;
     document.getElementById("pickupStopThreshold").value =
-        pickupUsage.stop_threshold_dbfs ?? -55;
+        pickupUsage.stop_threshold_dbfs ?? -61;
     document.getElementById("pickupStartConfirmSeconds").value =
         pickupUsage.start_confirm_seconds ?? 3;
     document.getElementById("pickupStopConfirmSeconds").value =

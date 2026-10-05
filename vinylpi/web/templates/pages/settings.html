@@ -178,13 +178,13 @@
                                 </div>
                                 <div class="form-row">
                                     <label for="pickupStartConfirmSeconds">Start confirmation (seconds)</label>
-                                    <input type="number" id="pickupStartConfirmSeconds" min="0.1" max="120" step="0.5">
+                                    <input type="number" id="pickupStartConfirmSeconds" min="0.1" max="120" step="0.1">
                                 </div>
                                 <div class="form-row">
                                     <label for="pickupStopConfirmSeconds">Stop grace period (seconds)</label>
-                                    <input type="number" id="pickupStopConfirmSeconds" min="0.1" max="600" step="1">
+                                    <input type="number" id="pickupStopConfirmSeconds" min="0.1" max="600" step="0.1">
                                 </div>
-                                <div class="form-hint">The start threshold should be louder than the stop threshold (for example -48 dBFS / -55 dBFS). The grace period prevents quiet passages and track gaps from stopping the timer.</div>
+                                <div class="form-hint">The start threshold should be louder than the stop threshold (for example -48 dBFS / -61 dBFS). The grace period prevents quiet passages and track gaps from stopping the timer.</div>
                             </div>
                         </div>
                     </div>

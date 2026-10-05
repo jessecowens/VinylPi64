@@ -129,6 +129,8 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertIn('id="pickupStopThreshold"', html)
         self.assertIn('id="pickupStartConfirmSeconds"', html)
         self.assertIn('id="pickupStopConfirmSeconds"', html)
+        self.assertIn('id="pickupStartConfirmSeconds" min="0.1" max="120" step="0.1"', html)
+        self.assertIn('id="pickupStopConfirmSeconds" min="0.1" max="600" step="0.1"', html)
         self.assertIn('Profile account connection', html)
         self.assertNotIn('Choose a category', html)
         self.assertNotIn('Open only the settings you need', html)
