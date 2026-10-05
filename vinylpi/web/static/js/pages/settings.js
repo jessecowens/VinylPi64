@@ -87,6 +87,7 @@ function syncDependentSettingStates() {
     setDependentState("debugLogs", "debug-details");
     setDependentState("discogsEnabled", "discogs-details");
     setDependentState("vinylAutoWakeEnabled", "vinyl-auto-wake-details");
+    setDependentState("vinylAudioSleepEnabled", "vinyl-audio-sleep-details");
     setDependentState("vinylAutoSleepEnabled", "vinyl-auto-sleep-details");
     setDependentState("spotifyAutoSleepEnabled", "spotify-auto-sleep-details");
     setDependentState("pickupUsageEnabled", "pickup-usage-details");
@@ -899,6 +900,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "debugLogs",
     "discogsEnabled",
     "vinylAutoWakeEnabled",
+    "vinylAudioSleepEnabled",
     "vinylAutoSleepEnabled",
     "spotifyAutoSleepEnabled",
     "pickupUsageEnabled",
@@ -1059,6 +1061,12 @@ async function loadConfig() {
         behavior.vinyl_auto_wake_threshold_dbfs ?? pickupUsage.start_threshold_dbfs ?? -48;
     document.getElementById("vinylAutoWakeConfirmSeconds").value =
         behavior.vinyl_auto_wake_confirm_seconds ?? 2;
+    document.getElementById("vinylAudioSleepEnabled").checked =
+        behavior.vinyl_audio_sleep_enabled !== false;
+    document.getElementById("vinylAudioSleepThreshold").value =
+        behavior.vinyl_audio_sleep_threshold_dbfs ?? pickupUsage.stop_threshold_dbfs ?? -61;
+    document.getElementById("vinylAudioSleepConfirmSeconds").value =
+        behavior.vinyl_audio_sleep_confirm_seconds ?? pickupUsage.stop_confirm_seconds ?? 30;
     document.getElementById("vinylAutoSleepEnabled").checked =
         behavior.vinyl_auto_sleep_enabled !== false;
     document.getElementById("vinylAutoSleepIterations").value =
@@ -1260,6 +1268,16 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     behavior.vinyl_auto_wake_confirm_seconds = Math.min(
         30,
         Math.max(0.1, parseFloat(document.getElementById("vinylAutoWakeConfirmSeconds").value) || 2),
+    );
+    behavior.vinyl_audio_sleep_enabled =
+        document.getElementById("vinylAudioSleepEnabled").checked;
+    behavior.vinyl_audio_sleep_threshold_dbfs = Math.min(
+        -1,
+        Math.max(-120, parseFloat(document.getElementById("vinylAudioSleepThreshold").value) || -61),
+    );
+    behavior.vinyl_audio_sleep_confirm_seconds = Math.min(
+        600,
+        Math.max(0.1, parseFloat(document.getElementById("vinylAudioSleepConfirmSeconds").value) || 30),
     );
     behavior.vinyl_auto_sleep_enabled =
         document.getElementById("vinylAutoSleepEnabled").checked;

@@ -4,7 +4,9 @@ import time
 
 from vinylpi.config.config_watcher import maybe_log_config_reload
 from vinylpi.core.audio_capture import record_sample
+from vinylpi.core.audio_standby import LowAudioSleepTracker, VinylAudioSleepConfig
 from vinylpi.core.pickup_usage import PickupUsageConfig, PickupUsageTracker, measure_wav_level
+from vinylpi.core.display import show_fallback_image
 from vinylpi.core.display_refresh import start_display_refresh_watcher
 from vinylpi.core.discogs_matcher import (
     apply_discogs_match,
@@ -77,6 +79,7 @@ def main_loop() -> None:
     raw_cfg = read_config()
     cfg = LoopConfig.from_config(raw_cfg)
     pickup_tracker = PickupUsageTracker(PickupUsageConfig.from_config(raw_cfg))
+    audio_sleep_tracker = LowAudioSleepTracker(VinylAudioSleepConfig.from_config(raw_cfg))
     if cfg.debug_log:
         print(f"\nStarting VinylPi64 recognition loop (every {cfg.delay}s)\n")
 
@@ -94,6 +97,7 @@ def main_loop() -> None:
             raw_cfg = read_config()
             cfg = LoopConfig.from_config(raw_cfg)
             pickup_tracker.configure(PickupUsageConfig.from_config(raw_cfg))
+            audio_sleep_tracker.configure(VinylAudioSleepConfig.from_config(raw_cfg))
 
             sample_seconds = cfg.sample_seconds_for_failures(display_state.consecutive_failures)
             if cfg.debug_log:
@@ -105,17 +109,39 @@ def main_loop() -> None:
                 time.sleep(5)
                 continue
 
-            if pickup_tracker.config.enabled:
+            # Pickup usage and level-based standby consume the *same* WAV that
+            # was already recorded for recognition. No second audio stream is
+            # opened while Vinyl mode is active.
+            level = None
+            if pickup_tracker.config.enabled or audio_sleep_tracker.config.enabled:
                 level = measure_wav_level(wav_bytes)
-                if level is not None:
-                    _observe_pickup_level(
-                        pickup_tracker,
-                        raw_cfg,
-                        level.dbfs,
-                        level.duration_seconds,
-                        persist=True,
-                        log_level=True,
-                    )
+
+            if level is not None and pickup_tracker.config.enabled:
+                _observe_pickup_level(
+                    pickup_tracker,
+                    raw_cfg,
+                    level.dbfs,
+                    level.duration_seconds,
+                    persist=True,
+                    log_level=True,
+                )
+
+            if level is not None and audio_sleep_tracker.config.enabled:
+                if cfg.debug_log and not pickup_tracker.config.enabled:
+                    print(f"Vinyl input level: {level.dbfs:.1f} dBFS")
+                if audio_sleep_tracker.observe(level.dbfs, level.duration_seconds):
+                    flush_timed_listen_if_needed(cfg, timed_listen_state)
+                    timed_listen_state = TimedListenState()
+                    if cfg.debug_log:
+                        print(
+                            "Vinyl audio standby reached "
+                            f"({level.dbfs:.1f} dBFS <= "
+                            f"{audio_sleep_tracker.config.threshold_dbfs:.1f} dBFS for "
+                            f"{audio_sleep_tracker.config.confirm_seconds:g}s); "
+                            "stopping recognition worker."
+                        )
+                    show_fallback_image()
+                    break
 
             track = recognize_song(wav_bytes)
             if track is None:
