@@ -57,7 +57,9 @@ CONFIG_DEFAULTS = {
         "timeout_seconds": 15
     },
     "spotify": {
-        "poll_seconds": 2.0
+        "poll_seconds": 2.0,
+        "auto_sleep_enabled": True,
+        "auto_sleep_iterations": 30
     },
     "discogs": {
         "enabled": False,
@@ -83,7 +85,8 @@ CONFIG_DEFAULTS = {
     },
     "behavior": {
         "loop_delay_seconds": 1,
-        "auto_sleep": 30,
+        "vinyl_auto_sleep_enabled": True,
+        "vinyl_auto_sleep_iterations": 30,
         "stats_min_consecutive": 3
     },
     "homeassistant": {
@@ -114,6 +117,23 @@ def load_config(path: Path | str | None = None) -> dict:
         user_cfg = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(user_cfg, dict):
             deep_update(cfg, user_cfg)
+
+            # Migrate the former Vinyl-only ``behavior.auto_sleep`` threshold to
+            # the explicit per-source power-saving settings. A value <= 0 used
+            # to disable auto sleep, so preserve that behavior as the new toggle.
+            user_behavior = user_cfg.get("behavior") or {}
+            if isinstance(user_behavior, dict) and "auto_sleep" in user_behavior:
+                legacy_value = user_behavior.get("auto_sleep")
+                try:
+                    legacy_iterations = int(legacy_value)
+                except (TypeError, ValueError):
+                    legacy_iterations = 30
+
+                behavior_cfg = cfg.setdefault("behavior", {})
+                if "vinyl_auto_sleep_enabled" not in user_behavior:
+                    behavior_cfg["vinyl_auto_sleep_enabled"] = legacy_iterations > 0
+                if "vinyl_auto_sleep_iterations" not in user_behavior:
+                    behavior_cfg["vinyl_auto_sleep_iterations"] = max(1, legacy_iterations or 30)
     except FileNotFoundError:
         pass
     except Exception:
@@ -132,5 +152,6 @@ def load_config(path: Path | str | None = None) -> dict:
     behavior = cfg.get("behavior")
     if isinstance(behavior, dict):
         behavior.pop("stats_repeat_guard_seconds", None)
+        behavior.pop("auto_sleep", None)
 
     return cfg

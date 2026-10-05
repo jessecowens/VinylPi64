@@ -170,6 +170,18 @@ class NoResultTests(unittest.TestCase):
 
         self.assertTrue(handle_no_result(cfg, disp, cfg_reloaded=False))
 
+    @patch("builtins.print")
+    def test_auto_sleep_toggle_can_disable_sleep(self, print_mock):
+        cfg = LoopConfig(
+            fallback_allowed_failures=99,
+            auto_sleep=1,
+            auto_sleep_enabled=False,
+        )
+        disp = DisplayState()
+
+        self.assertFalse(handle_no_result(cfg, disp, cfg_reloaded=False))
+        self.assertEqual(disp.consecutive_failures, 1)
+
     @patch("vinylpi.core.loop_logic.clear_side_flip_prompt")
     @patch("vinylpi.core.loop_logic.show_fallback_image")
     def test_disabled_fallback_keeps_current_display(self, show_fallback, clear_prompt):

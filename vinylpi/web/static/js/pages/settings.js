@@ -86,6 +86,8 @@ function syncDependentSettingStates() {
     setDependentState("useHA", "ha-details");
     setDependentState("debugLogs", "debug-details");
     setDependentState("discogsEnabled", "discogs-details");
+    setDependentState("vinylAutoSleepEnabled", "vinyl-auto-sleep-details");
+    setDependentState("spotifyAutoSleepEnabled", "spotify-auto-sleep-details");
 }
 
 function setSelectedImagePath(inputId, pathId, path) {
@@ -894,6 +896,8 @@ document.addEventListener("DOMContentLoaded", () => {
     "useHA",
     "debugLogs",
     "discogsEnabled",
+    "vinylAutoSleepEnabled",
+    "spotifyAutoSleepEnabled",
   ].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", syncDependentSettingStates);
   });
@@ -1026,12 +1030,18 @@ async function loadConfig() {
     // SPOTIFY
     document.getElementById("spotifyPollSeconds").value =
         spotify.poll_seconds ?? 2;
+    document.getElementById("spotifyAutoSleepEnabled").checked =
+        spotify.auto_sleep_enabled !== false;
+    document.getElementById("spotifyAutoSleepIterations").value =
+        spotify.auto_sleep_iterations ?? 30;
 
     // BEHAVIOR
     document.getElementById("behaviorLoopDelay").value =
         behavior.loop_delay_seconds ?? 1;
-    document.getElementById("behaviorAutoSleep").value =
-        behavior.auto_sleep ?? 50;
+    document.getElementById("vinylAutoSleepEnabled").checked =
+        behavior.vinyl_auto_sleep_enabled !== false;
+    document.getElementById("vinylAutoSleepIterations").value =
+        behavior.vinyl_auto_sleep_iterations ?? Math.max(1, behavior.auto_sleep ?? 30);
     document.getElementById("shazamTimeout").value =
         shazam.timeout_seconds ?? 15;
 
@@ -1189,12 +1199,23 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         60,
         Math.max(1, parseFloat(document.getElementById("spotifyPollSeconds").value) || 2),
     );
+    spotify.auto_sleep_enabled =
+        document.getElementById("spotifyAutoSleepEnabled").checked;
+    spotify.auto_sleep_iterations = Math.max(
+        1,
+        parseInt(document.getElementById("spotifyAutoSleepIterations").value, 10) || 30,
+    );
 
     // BEHAVIOR
     behavior.loop_delay_seconds =
         parseFloat(document.getElementById("behaviorLoopDelay").value) || 1;
-    behavior.auto_sleep =
-        Math.max(0, parseInt(document.getElementById("behaviorAutoSleep").value, 10) || 0);
+    behavior.vinyl_auto_sleep_enabled =
+        document.getElementById("vinylAutoSleepEnabled").checked;
+    behavior.vinyl_auto_sleep_iterations = Math.max(
+        1,
+        parseInt(document.getElementById("vinylAutoSleepIterations").value, 10) || 30,
+    );
+    delete behavior.auto_sleep;
     shazam.timeout_seconds = Math.min(
         60,
         Math.max(5, parseFloat(document.getElementById("shazamTimeout").value) || 15),

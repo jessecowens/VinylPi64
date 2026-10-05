@@ -120,7 +120,13 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertIn('id="section-spotify"', html)
         self.assertIn('id="spotifySettingsConnect"', html)
         self.assertIn('id="spotifyPollSeconds"', html)
+        self.assertIn('id="spotifyAutoSleepEnabled"', html)
+        self.assertIn('id="spotifyAutoSleepIterations"', html)
+        self.assertIn('id="vinylAutoSleepEnabled"', html)
+        self.assertIn('id="vinylAutoSleepIterations"', html)
         self.assertIn('Profile account connection', html)
+        self.assertNotIn('Choose a category', html)
+        self.assertNotIn('Open only the settings you need', html)
 
     def test_stats_page_contains_share_button(self):
         response = self.client.get("/stats.html")

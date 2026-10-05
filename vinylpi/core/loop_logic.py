@@ -93,7 +93,7 @@ def handle_no_result(
         disp.last_display_was_fallback = display_shown is not False
         disp.last_display_was_inferred = False
 
-    if cfg.auto_sleep > 0 and disp.consecutive_failures >= cfg.auto_sleep:
+    if cfg.auto_sleep_enabled and disp.consecutive_failures >= cfg.auto_sleep:
         print("No song detected for a while, entering sleep mode.")
         return True
     return False

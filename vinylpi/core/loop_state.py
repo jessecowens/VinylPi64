@@ -9,6 +9,7 @@ class LoopConfig:
     fallback_enabled: bool = True
     side_flip_enabled: bool = True
     auto_sleep: int = 50
+    auto_sleep_enabled: bool = True
     base_sample_seconds: float = 4.0
     adaptive_sample_enabled: bool = False
     adaptive_failure_durations: tuple[float, ...] = (6.0, 8.0)
@@ -46,7 +47,8 @@ class LoopConfig:
             fallback_allowed_failures=max(1, int(fallback.get("allowed_failures", 3))),
             fallback_enabled=bool(fallback.get("enabled", True)),
             side_flip_enabled=bool(fallback.get("side_flip_enabled", True)),
-            auto_sleep=int(behavior.get("auto_sleep", 50)),
+            auto_sleep=max(1, int(behavior.get("vinyl_auto_sleep_iterations", 30))),
+            auto_sleep_enabled=bool(behavior.get("vinyl_auto_sleep_enabled", True)),
             base_sample_seconds=max(0.5, float(audio.get("sample_seconds", 4))),
             adaptive_sample_enabled=bool(adaptive.get("enabled", False)),
             adaptive_failure_durations=cleaned_durations or (6.0, 8.0),

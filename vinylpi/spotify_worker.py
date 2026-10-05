@@ -4,7 +4,7 @@ import time
 
 from dotenv import load_dotenv
 
-from vinylpi.core.display import start_scrolling_display
+from vinylpi.core.display import show_fallback_image, start_scrolling_display
 from vinylpi.core.display_refresh import start_display_refresh_watcher
 from vinylpi.core.image_utils import dynamic_bg_color, load_image
 from vinylpi.core.spotify_stats import (
@@ -87,6 +87,17 @@ def _poll_seconds() -> float:
         return 2.0
 
 
+def _auto_sleep_settings() -> tuple[bool, int]:
+    """Return Spotify's live idle auto-sleep toggle and iteration threshold."""
+    spotify_cfg = read_config().get("spotify") or {}
+    enabled = bool(spotify_cfg.get("auto_sleep_enabled", True))
+    try:
+        iterations = max(1, int(spotify_cfg.get("auto_sleep_iterations", 30)))
+    except (TypeError, ValueError):
+        iterations = 30
+    return enabled, iterations
+
+
 def _last_recognized_spotify_track_id() -> str | None:
     """Restore the last Spotify track across pause/off/worker restarts."""
     status = get_last_source_status("spotify") or {}
@@ -103,6 +114,7 @@ def main() -> None:
     last_progress_ms: int | None = None
     last_db_path: str | None = None
     displayed_in_session = False
+    consecutive_idle_polls = 0
 
     debug_log = bool((read_config().get("debug") or {}).get("logs", False))
     start_display_refresh_watcher(debug_log=debug_log)
@@ -122,18 +134,33 @@ def main() -> None:
                 last_track_id = _last_recognized_spotify_track_id()
                 last_progress_ms = None
                 displayed_in_session = False
+                consecutive_idle_polls = 0
                 _backfill_missing_genres(client)
 
             track = client.get_currently_playing()
-            if track is None:
-                # Losing the playback response (including a pause on clients that
-                # return no item) must not forget which song was last recognized.
-                # Only the progress baseline is discarded to avoid adding paused
-                # time when playback becomes available again.
+            if track is None or not track.is_playing:
+                # A 204/no-item response and an explicitly paused track are both
+                # idle Spotify polls. Keep the last track id for de-duplication,
+                # but discard the progress baseline so paused time is not counted.
+                consecutive_idle_polls += 1
                 last_progress_ms = None
+
+                auto_sleep_enabled, auto_sleep_iterations = _auto_sleep_settings()
+                if debug_log:
+                    print(
+                        "Spotify idle poll "
+                        f"(#{consecutive_idle_polls}/{auto_sleep_iterations})"
+                    )
+
+                if auto_sleep_enabled and consecutive_idle_polls >= auto_sleep_iterations:
+                    print("Spotify has been idle for a while, entering sleep mode.")
+                    show_fallback_image()
+                    return
+
                 time.sleep(poll_seconds)
                 continue
 
+            consecutive_idle_polls = 0
             new_play = track.track_id != last_track_id
 
             if new_play:

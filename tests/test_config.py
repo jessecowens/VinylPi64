@@ -37,6 +37,10 @@ class ConfigLoaderTests(unittest.TestCase):
         self.assertFalse(cfg["image"]["show_album"])
         self.assertEqual(cfg["image"]["canvas_size"], 64)
         self.assertEqual(cfg["spotify"]["poll_seconds"], 2.0)
+        self.assertTrue(cfg["spotify"]["auto_sleep_enabled"])
+        self.assertEqual(cfg["spotify"]["auto_sleep_iterations"], 30)
+        self.assertTrue(cfg["behavior"]["vinyl_auto_sleep_enabled"])
+        self.assertEqual(cfg["behavior"]["vinyl_auto_sleep_iterations"], 30)
 
     def test_load_config_returns_independent_defaults_for_missing_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -56,6 +60,34 @@ class ConfigLoaderTests(unittest.TestCase):
 
         self.assertEqual(cfg, CONFIG_DEFAULTS)
 
+
+    def test_load_config_migrates_legacy_vinyl_auto_sleep_threshold(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "config.json"
+            path.write_text(
+                json.dumps({"behavior": {"auto_sleep": 100}}),
+                encoding="utf-8",
+            )
+
+            cfg = load_config(path)
+
+        self.assertTrue(cfg["behavior"]["vinyl_auto_sleep_enabled"])
+        self.assertEqual(cfg["behavior"]["vinyl_auto_sleep_iterations"], 100)
+        self.assertNotIn("auto_sleep", cfg["behavior"])
+
+    def test_load_config_migrates_disabled_legacy_vinyl_auto_sleep(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "config.json"
+            path.write_text(
+                json.dumps({"behavior": {"auto_sleep": 0}}),
+                encoding="utf-8",
+            )
+
+            cfg = load_config(path)
+
+        self.assertFalse(cfg["behavior"]["vinyl_auto_sleep_enabled"])
+        self.assertEqual(cfg["behavior"]["vinyl_auto_sleep_iterations"], 30)
+        self.assertNotIn("auto_sleep", cfg["behavior"])
 
     def test_load_config_removes_legacy_time_based_stats_repeat_guard(self):
         with tempfile.TemporaryDirectory() as temp_dir:

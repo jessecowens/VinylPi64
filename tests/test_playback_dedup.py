@@ -6,7 +6,11 @@ from unittest.mock import Mock, patch
 
 from vinylpi.core.loop_state import StatsSwitchState
 from vinylpi.core.loop_logic import restore_last_vinyl_song
-from vinylpi.spotify_worker import _last_recognized_spotify_track_id, _poll_seconds
+from vinylpi.spotify_worker import (
+    _auto_sleep_settings,
+    _last_recognized_spotify_track_id,
+    _poll_seconds,
+)
 
 
 class PersistentPlaybackDedupTests(unittest.TestCase):
@@ -33,6 +37,16 @@ class PersistentPlaybackDedupTests(unittest.TestCase):
     def test_spotify_poll_interval_has_safe_minimum(self, read_config):
         read_config.return_value = {"spotify": {"poll_seconds": 0.1}}
         self.assertEqual(_poll_seconds(), 1.0)
+
+    @patch("vinylpi.spotify_worker.read_config")
+    def test_spotify_auto_sleep_settings_come_from_settings(self, read_config):
+        read_config.return_value = {
+            "spotify": {
+                "auto_sleep_enabled": False,
+                "auto_sleep_iterations": 42,
+            }
+        }
+        self.assertEqual(_auto_sleep_settings(), (False, 42))
 
     @staticmethod
     def _spotify_track(track_id: str, progress_ms: int = 1000, *, is_playing: bool = True):
@@ -86,6 +100,37 @@ class PersistentPlaybackDedupTests(unittest.TestCase):
 
         record_play.assert_not_called()
         self.assertGreaterEqual(display.call_count, 1)
+
+    @patch("vinylpi.spotify_worker.load_dotenv")
+    @patch("vinylpi.spotify_worker._backfill_missing_genres")
+    @patch("vinylpi.spotify_worker._display_track")
+    @patch("vinylpi.spotify_worker.record_spotify_play")
+    @patch("vinylpi.spotify_worker.show_fallback_image")
+    @patch("vinylpi.spotify_worker._last_recognized_spotify_track_id", return_value="A")
+    @patch("vinylpi.spotify_worker.get_active_db_path", return_value="/tmp/profile.db")
+    @patch("vinylpi.spotify_worker._auto_sleep_settings", return_value=(True, 2))
+    @patch("vinylpi.spotify_worker._poll_seconds", return_value=2.0)
+    @patch("vinylpi.spotify_worker.start_display_refresh_watcher")
+    def test_spotify_auto_sleep_stops_after_consecutive_idle_polls(
+        self, watcher, poll, auto_sleep, db_path, last_track, fallback, record_play, display, backfill, dotenv
+    ):
+        from vinylpi import spotify_worker
+
+        client = Mock()
+        client.get_currently_playing.side_effect = [
+            None,
+            self._spotify_track("A", 1000, is_playing=False),
+        ]
+
+        with patch("vinylpi.spotify_worker.SpotifyClient", return_value=client), patch(
+            "vinylpi.spotify_worker.time.sleep"
+        ):
+            spotify_worker.main()
+
+        self.assertEqual(client.get_currently_playing.call_count, 2)
+        fallback.assert_called_once_with()
+        record_play.assert_not_called()
+        display.assert_not_called()
 
     @patch("vinylpi.spotify_worker.load_dotenv")
     @patch("vinylpi.spotify_worker._backfill_missing_genres")
