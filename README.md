@@ -4,9 +4,10 @@
   <img src="https://img.shields.io/badge/platform-Raspberry%20Pi%20Zero%202%20W-red" alt="Platform: Raspberry Pi Zero 2 W">
   <img src="https://img.shields.io/badge/python-3.11%2B-yellow" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/license-CC--BY--NC%204.0-blue" alt="License: CC BY-NC 4.0">
+  <a href="https://github.com/simontrost/VinylPi64/stargazers"><img src="https://img.shields.io/github/stars/simontrost/VinylPi64?style=flat&logo=github&label=stars" alt="GitHub stars"></a>
 </p>
 
-VinylPi64 listens to audio from a turntable, identifies the current song with **ShazamIO**, builds a custom **64×64 pixel frame**, and displays it on a **Divoom Pixoo-64**. A local web app provides controls, settings, lyrics, device management, and listening statistics.
+VinylPi64 identifies music from a USB turntable with **ShazamIO** or from **Spotify**, builds a custom **64×64 pixel frame**, and displays it on a **Divoom Pixoo-64**. A local web app provides controls, settings, lyrics, device management, and listening statistics.
 
 <p align="left">
   <img src="assets/readme/Logo.png" width="400" alt="VinylPi64 logo">
@@ -14,18 +15,20 @@ VinylPi64 listens to audio from a turntable, identifies the current song with **
 
 ## Features
 
-- Automatic song recognition from a USB audio source
-- Album artwork, artist, title, album, genre, and Shazam metadata
+- Vinyl recognition from USB audio with ShazamIO and Spotify playback recognition
+- Album artwork, artist, title, album, genre, and track metadata
+- Low-power audio standby with configurable wake-on-audio and audio-level auto-standby
+- Optional failure-based auto-standby for Vinyl and Spotify
+- Pickup usage tracking based on configurable input-level thresholds
 - Custom Pixoo renderer with:
   - dynamic or manual background and text colors
   - configurable cover size, typography, spacing, and marquee text
   - fallback images
 - Local web app with:
-  - live dashboard updates
+  - live dashboard updates and Vinyl / Spotify / Off modes
   - lyrics and track information
-  - recognition controls
   - Pixoo brightness, channels, discovery, reboot, and community GIFs
-  - statistics for listening time, songs, artists, albums, genres, and covers
+  - statistics for listening time, pickup usage, songs, artists, albums, genres, and covers
 - SQLite storage for songs, statistics, caches, and runtime state
 - Configurable adaptive sample duration after failed recognitions
 - Optional Home Assistant color-sync integration
@@ -124,12 +127,11 @@ Most options can be changed from the **Settings** page. This includes:
 
 - audio device, sample rate, channels, and recording duration
 - adaptive recording durations after failed recognitions
+- wake-on-audio, pickup thresholds, and Vinyl/Spotify standby behavior
+- Spotify polling interval
 - Pixoo layout, colors, text, cover size, and scrolling
-- fallback images
-- Pixoo discovery and network values
-- recognition timing
-- Home Assistant integration
-- debug settings
+- fallback images and Pixoo discovery
+- Home Assistant integration and debug settings
 
 The configuration is stored in:
 
@@ -238,9 +240,11 @@ Additional local API endpoints can be used for Pixoo power, music mode, and remo
 
 ## Recognition notes
 
-Recognition is based on recorded audio samples rather than a continuous stream. A normal attempt uses the configured base duration. When adaptive sampling is enabled, VinylPi64 can automatically use longer recordings after failed attempts and return to the base duration after a successful recognition.
+Vinyl recognition uses recorded audio samples. Adaptive sampling can automatically use longer recordings after failed attempts and return to the base duration after a successful recognition.
 
-Recognition quality depends on the audio level, the selected passage, background noise, and Shazam's result. Quiet intros, live versions, heavy surface noise, or very short samples can reduce accuracy.
+With **Wake on Audio** enabled, the Off state keeps only a lightweight RMS level monitor active. Vinyl recognition starts when the configured wake threshold is reached and can return to standby after sustained low input. Pickup usage is measured from the same audio data, so it does not require a second audio stream.
+
+Recognition quality depends on the audio level, selected passage, background noise, and Shazam's result. Quiet intros, live versions, heavy surface noise, or very short samples can reduce accuracy.
 
 ## Troubleshooting
 

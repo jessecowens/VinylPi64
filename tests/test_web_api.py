@@ -231,8 +231,9 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.data, b"png-bytes")
         build_share_card_image_mock.assert_called_once_with()
 
+    @patch("vinylpi.web.routes.profiles_api.select_idle_profile")
     @patch("vinylpi.web.routes.profiles_api.create_profile")
-    def test_create_profile_requires_password_and_can_activate(self, create_profile_mock):
+    def test_create_profile_requires_password_and_can_activate(self, create_profile_mock, select_idle_profile_mock):
         create_profile_mock.return_value = {"id": "abc", "name": "Simon"}
 
         response = self.client.post(
@@ -254,6 +255,7 @@ class WebApiTests(unittest.TestCase):
             avatar_png=None,
         )
         self.assertTrue(response.get_json()["activated"])
+        select_idle_profile_mock.assert_called_once_with("abc")
         with self.client.session_transaction() as browser_session:
             self.assertEqual(browser_session["vinylpi_profile_id"], "abc")
 
@@ -270,8 +272,9 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["error"], "Passwords do not match")
 
+    @patch("vinylpi.web.routes.profiles_api.select_idle_profile")
     @patch("vinylpi.web.routes.profiles_api.authenticate_profile")
-    def test_profile_login_is_stored_in_browser_session(self, authenticate_profile_mock):
+    def test_profile_login_is_stored_in_browser_session(self, authenticate_profile_mock, select_idle_profile_mock):
         authenticate_profile_mock.return_value = {
             "id": "abc",
             "name": "Simon",
@@ -285,11 +288,13 @@ class WebApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         authenticate_profile_mock.assert_called_once_with("abc", "secret")
+        select_idle_profile_mock.assert_called_once_with("abc")
         with self.client.session_transaction() as browser_session:
             self.assertEqual(browser_session["vinylpi_profile_id"], "abc")
 
+    @patch("vinylpi.web.routes.profiles_api.select_idle_profile")
     @patch("vinylpi.web.routes.profiles_api.authenticate_profile")
-    def test_two_browser_clients_keep_independent_profile_sessions(self, authenticate_profile_mock):
+    def test_two_browser_clients_keep_independent_profile_sessions(self, authenticate_profile_mock, select_idle_profile_mock):
         authenticate_profile_mock.side_effect = lambda profile_id, _password: {
             "id": profile_id,
             "name": profile_id,
@@ -300,13 +305,17 @@ class WebApiTests(unittest.TestCase):
         self.client.post("/api/profiles/simon/activate", json={"password": "one"})
         second_client.post("/api/profiles/test/activate", json={"password": "two"})
 
+        self.assertEqual(select_idle_profile_mock.call_count, 2)
+        select_idle_profile_mock.assert_any_call("simon")
+        select_idle_profile_mock.assert_any_call("test")
         with self.client.session_transaction() as first_session:
             self.assertEqual(first_session["vinylpi_profile_id"], "simon")
         with second_client.session_transaction() as second_session:
             self.assertEqual(second_session["vinylpi_profile_id"], "test")
 
+    @patch("vinylpi.web.routes.profiles_api.select_idle_profile")
     @patch("vinylpi.web.routes.profiles_api.initialize_profile_password_for_session")
-    def test_legacy_profile_can_initialize_password_and_log_in(self, initialize_mock):
+    def test_legacy_profile_can_initialize_password_and_log_in(self, initialize_mock, select_idle_profile_mock):
         initialize_mock.return_value = {
             "id": "legacy",
             "name": "Legacy",
@@ -320,6 +329,7 @@ class WebApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         initialize_mock.assert_called_once_with("legacy", "secret")
+        select_idle_profile_mock.assert_called_once_with("legacy")
         with self.client.session_transaction() as browser_session:
             self.assertEqual(browser_session["vinylpi_profile_id"], "legacy")
 
