@@ -8,7 +8,7 @@ _LEGACY_CONFIG_PATH = CONFIG_PATH
 
 CONFIG_DEFAULTS = {
     "audio": {
-        "device_name_contains": "USB AUDIO",
+        "device_name_contains": "",
         "sample_seconds": 4,
         "sample_rate": 44100,
         "channels": 1,

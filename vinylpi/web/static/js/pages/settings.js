@@ -16,6 +16,113 @@ function showToast(message, isError = false) {
     toastTimer = window.setTimeout(() => toast.classList.remove("show"), 3200);
 }
 
+
+function setAudioDeviceStatus(message = "") {
+    const status = document.getElementById("audioDeviceStatus");
+    if (!status) return;
+    const text = String(message || "").trim();
+    status.textContent = text;
+    status.hidden = !text;
+}
+
+function audioDeviceLabel(device, disambiguate = false) {
+    const name = String(device?.name || "Audio input");
+    if (!disambiguate) return name;
+    const hostApi = String(device?.hostapi || "").trim();
+    return hostApi ? `${name} · ${hostApi}` : `${name} · device ${device?.index ?? "?"}`;
+}
+
+function populateAudioDeviceSelect(devices, configuredName = "") {
+    const select = document.getElementById("audioDeviceName");
+    if (!select) return;
+
+    const configured = String(configuredName || "").trim();
+    const normalized = configured.toLocaleLowerCase();
+    select.replaceChildren();
+
+    const automatic = document.createElement("option");
+    automatic.value = "";
+    automatic.textContent = "Automatic";
+    select.appendChild(automatic);
+
+    const nameCounts = new Map();
+    devices.forEach((device) => {
+        const key = String(device?.name || "").toLocaleLowerCase();
+        nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
+    });
+
+    devices.forEach((device) => {
+        const option = document.createElement("option");
+        option.value = String(device.name || "");
+        const key = option.value.toLocaleLowerCase();
+        option.textContent = audioDeviceLabel(device, (nameCounts.get(key) || 0) > 1);
+        select.appendChild(option);
+    });
+
+    let selectedDevice = null;
+    if (configured) {
+        selectedDevice = devices.find(
+            (device) => String(device.name || "").toLocaleLowerCase() === normalized,
+        ) || devices.find(
+            (device) => String(device.name || "").toLocaleLowerCase().includes(normalized),
+        );
+    }
+
+    if (selectedDevice) {
+        select.value = String(selectedDevice.name || "");
+        return;
+    }
+
+    if (configured) {
+        const unavailable = document.createElement("option");
+        unavailable.value = configured;
+        unavailable.textContent = `${configured} · unavailable`;
+        unavailable.dataset.unavailable = "true";
+        select.appendChild(unavailable);
+        select.value = configured;
+        return;
+    }
+
+    if (devices.length === 1) {
+        select.value = String(devices[0].name || "");
+    } else {
+        select.value = "";
+    }
+}
+
+async function loadAudioDevices(configuredName = null, { announce = false } = {}) {
+    const select = document.getElementById("audioDeviceName");
+    const refresh = document.getElementById("refreshAudioDevices");
+    if (!select) return;
+
+    const preferred = configuredName === null
+        ? String(select.value || "")
+        : String(configuredName || "");
+
+    if (refresh) refresh.disabled = true;
+    try {
+        const response = await fetch("/api/audio-devices", { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || "Audio device scan failed");
+        }
+
+        const devices = Array.isArray(data.devices) ? data.devices : [];
+        populateAudioDeviceSelect(devices, preferred);
+        setAudioDeviceStatus(devices.length ? "" : "No audio inputs detected.");
+        if (announce) {
+            showToast(`${devices.length} audio input${devices.length === 1 ? "" : "s"} found.`);
+        }
+    } catch (error) {
+        console.error(error);
+        populateAudioDeviceSelect([], preferred);
+        setAudioDeviceStatus("Audio devices could not be loaded.");
+        if (announce) showToast("Audio device scan failed.", true);
+    } finally {
+        if (refresh) refresh.disabled = false;
+    }
+}
+
 function rgbToHex(arr) {
     const [r, g, b] = arr;
     return "#" + [r, g, b]
@@ -908,6 +1015,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById(id)?.addEventListener("change", syncDependentSettingStates);
   });
 
+  document.getElementById("refreshAudioDevices")?.addEventListener("click", () => {
+    loadAudioDevices(null, { announce: true });
+  });
   document.getElementById("discogsConnect")?.addEventListener("click", connectDiscogs);
   document.getElementById("discogsSync")?.addEventListener("click", startDiscogsSync);
   syncDependentSettingStates();
@@ -933,8 +1043,7 @@ async function loadConfig() {
     const homeassistant = cfg.homeassistant || {};
 
     // AUDIO
-    document.getElementById("audioDeviceName").value =
-        audio.device_name_contains || "";
+    await loadAudioDevices(audio.device_name_contains || "");
     document.getElementById("audioSampleSeconds").value =
         audio.sample_seconds ?? 4;
     document.getElementById("audioSampleRate").value =
@@ -1131,7 +1240,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
 
     // AUDIO
     audio.device_name_contains =
-        document.getElementById("audioDeviceName").value;
+        document.getElementById("audioDeviceName").value.trim();
     audio.sample_seconds =
         parseFloat(document.getElementById("audioSampleSeconds").value) || 4;
     audio.sample_rate =

@@ -157,6 +157,20 @@ def pcm16_dbfs(raw_bytes: bytes) -> float:
     return max(_DBFS_FLOOR, 20.0 * math.log10(rms / 32767.0))
 
 
+def _monitor_audio_settings(cfg: dict) -> tuple[str, int, int]:
+    audio_cfg = cfg.get("audio") or {}
+    configured_input = str(audio_cfg.get("device_name_contains") or "").strip()
+    try:
+        sample_rate = max(8000, int(audio_cfg.get("sample_rate", 44100)))
+    except (TypeError, ValueError):
+        sample_rate = 44100
+    try:
+        channels = max(1, min(2, int(audio_cfg.get("channels", 1))))
+    except (TypeError, ValueError):
+        channels = 1
+    return configured_input, sample_rate, channels
+
+
 def wait_for_audio_wake(
     *,
     require_rearm: bool = False,
@@ -194,15 +208,7 @@ def wait_for_audio_wake(
             return None
         tracker.configure(wake_cfg)
 
-        audio_cfg = raw_cfg.get("audio") or {}
-        try:
-            sample_rate = max(8000, int(audio_cfg.get("sample_rate", 44100)))
-        except (TypeError, ValueError):
-            sample_rate = 44100
-        try:
-            channels = max(1, min(2, int(audio_cfg.get("channels", 1))))
-        except (TypeError, ValueError):
-            channels = 1
+        configured_input, sample_rate, channels = _monitor_audio_settings(raw_cfg)
         block_frames = max(256, int(round(sample_rate * _MONITOR_BLOCK_SECONDS)))
         block_duration = block_frames / float(sample_rate)
         debug_log = bool((raw_cfg.get("debug") or {}).get("logs", False))
@@ -210,7 +216,7 @@ def wait_for_audio_wake(
         device = auto_detect_usb_device()
         if device is None:
             if debug_log:
-                print("Auto-wake monitor could not find the configured USB audio input; retrying.")
+                print("Auto-wake monitor could not find the configured audio input; retrying.")
             time.sleep(_RETRY_SECONDS)
             continue
 
@@ -241,6 +247,13 @@ def wait_for_audio_wake(
                         return None
                     tracker.configure(wake_cfg)
                     debug_log = bool((raw_cfg.get("debug") or {}).get("logs", False))
+
+                    # Reopen the PortAudio stream when the selected input or its
+                    # capture settings change in the web UI.
+                    if _monitor_audio_settings(raw_cfg) != (configured_input, sample_rate, channels):
+                        if debug_log:
+                            print("Audio input settings changed; reopening auto-wake monitor.")
+                        break
 
                     raw_audio, overflowed = stream.read(block_frames)
                     level_dbfs = pcm16_dbfs(bytes(raw_audio))

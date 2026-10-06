@@ -5,6 +5,7 @@ from copy import deepcopy
 
 from flask import Blueprint, jsonify, request
 
+from vinylpi.core.audio_capture import list_audio_input_devices
 from vinylpi.core.display_refresh import request_display_refresh
 from vinylpi.web.services.config import read_config, write_config, reset_config
 
@@ -32,6 +33,16 @@ def _strip_read_only_and_sensitive_fields(data: dict) -> dict:
 @config_bp.get("/api/config")
 def api_config():
     return jsonify(_public_config(read_config()))
+
+
+@config_bp.get("/api/audio-devices")
+def api_audio_devices():
+    try:
+        devices = list_audio_input_devices()
+    except Exception as exc:
+        return jsonify({"ok": False, "devices": [], "error": str(exc)}), 503
+
+    return jsonify({"ok": True, "devices": devices})
 
 
 @config_bp.post("/api/config")
