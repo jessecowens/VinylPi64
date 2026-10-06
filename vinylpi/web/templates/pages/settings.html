@@ -88,14 +88,26 @@
                             <div class="group-title">Recording</div>
                             <div class="form-row">
                                 <label for="audioDeviceName">Input device</label>
-                                <select id="audioDeviceName" class="pixoo-select">
-                                    <option value="">Automatic</option>
-                                </select>
+                                <div class="audio-device-control">
+                                    <select id="audioDeviceName" class="pixoo-select">
+                                        <option value="">Automatic</option>
+                                    </select>
+                                    <button
+                                        type="button"
+                                        id="refreshAudioDevices"
+                                        class="audio-device-refresh"
+                                        aria-label="Refresh audio devices"
+                                        title="Refresh audio devices"
+                                    >
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <path d="M20 6v6h-6"></path>
+                                            <path d="M4 18v-6h6"></path>
+                                            <path d="M6.5 9a7 7 0 0 1 11.7-2.6L20 8"></path>
+                                            <path d="M17.5 15a7 7 0 0 1-11.7 2.6L4 16"></path>
+                                        </svg>
+                                    </button>
+                                </div>
                                 <div id="audioDeviceStatus" class="form-hint" role="status" aria-live="polite" hidden></div>
-                            </div>
-                            <div class="form-row">
-                                <label for="refreshAudioDevices">Device list</label>
-                                <button type="button" id="refreshAudioDevices">Refresh</button>
                             </div>
                             <div class="adaptive-sample-block">
                                 <div class="adaptive-sample-header">

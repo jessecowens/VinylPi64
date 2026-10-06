@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import re
 
 import sounddevice as sd
 import soundfile as sf
@@ -23,8 +24,61 @@ def _default_input_index() -> int | None:
     return index if index >= 0 else None
 
 
-def list_audio_input_devices() -> list[dict]:
-    """Return PortAudio capture devices in a small JSON-friendly format."""
+_ALSA_VIRTUAL_INPUT_NAMES = {
+    "default",
+    "sysdefault",
+    "spdif",
+    "iec958",
+    "dmix",
+    "dsnoop",
+    "front",
+    "pulse",
+    "pipewire",
+    "jack",
+    "oss",
+    "samplerate",
+    "speexrate",
+    "upmix",
+    "vdownmix",
+}
+
+
+def _clean_audio_device_label(name: str) -> str:
+    """Return a consumer-facing label while keeping the raw PortAudio name internal."""
+    raw = str(name or "").strip()
+    if not raw:
+        return "Audio input"
+
+    # ALSA's hardware entries commonly look like
+    # ``USB AUDIO CODEC: Audio (hw:0,0)``. The hw address is useful internally,
+    # but it is implementation detail in the Settings UI.
+    cleaned = re.sub(
+        r"\s*:\s*Audio\s*\(hw:\d+,\d+\)\s*$",
+        "",
+        raw,
+        flags=re.IGNORECASE,
+    ).strip()
+    return cleaned or raw
+
+
+def _is_alsa_virtual_input(name: str, host_api_name: str) -> bool:
+    """Identify common ALSA aliases/plugins that are not separate physical inputs."""
+    if "alsa" not in str(host_api_name or "").casefold():
+        return False
+
+    normalized = re.sub(r"\s+", " ", str(name or "").strip().casefold())
+    if not normalized:
+        return False
+
+    # Handle both plain aliases (``default``) and parameterized forms such as
+    # ``sysdefault:CARD=...`` without hiding descriptive hardware names.
+    alias = re.split(r"[:=,\s]", normalized, maxsplit=1)[0]
+    if alias in _ALSA_VIRTUAL_INPUT_NAMES:
+        return True
+    return alias.startswith("surround")
+
+
+def _query_audio_input_devices() -> list[dict]:
     devices = sd.query_devices()
     try:
         host_apis = sd.query_hostapis()
@@ -52,13 +106,29 @@ def list_audio_input_devices() -> list[dict]:
             {
                 "index": index,
                 "name": name,
+                "display_name": _clean_audio_device_label(name),
                 "max_input_channels": max_inputs,
                 "hostapi": host_api_name,
                 "is_default": index == default_input,
+                "is_virtual": _is_alsa_virtual_input(name, host_api_name),
             }
         )
 
     return result
+
+
+def list_audio_input_devices() -> list[dict]:
+    """Return user-selectable capture devices, hiding redundant ALSA aliases.
+
+    PortAudio exposes ALSA plugin aliases such as ``default`` and ``sysdefault``
+    alongside the underlying hardware. They are useful plumbing but confusing
+    as separate choices. Prefer physical/descriptive inputs in the UI. If a
+    system exposes *only* virtual inputs (for example a Pulse/PipeWire bridge),
+    keep them as a fallback so VinylPi remains usable on other Linux stacks.
+    """
+    devices = _query_audio_input_devices()
+    physical = [device for device in devices if not device["is_virtual"]]
+    return physical or devices
 
 
 def auto_detect_usb_device() -> int | None:
@@ -74,21 +144,26 @@ def auto_detect_usb_device() -> int | None:
     debug_log = bool(cfg["debug"].get("logs", False))
 
     try:
-        devices = list_audio_input_devices()
+        all_devices = _query_audio_input_devices()
     except Exception as exc:
         print(f"Could not query audio devices: {exc}")
         return None
 
-    if not devices:
+    if not all_devices:
         print("No audio input devices are available.")
         return None
 
     if not configured_name:
-        selected = next((device for device in devices if device["is_default"]), devices[0])
+        visible_devices = [device for device in all_devices if not device["is_virtual"]] or all_devices
+        selected = next((device for device in visible_devices if device["is_default"]), visible_devices[0])
         if debug_log:
             print(f"Using audio input: #{selected['index']} -> {selected['name']}")
         return int(selected["index"])
 
+    # Resolve saved names against every PortAudio input so older configs that
+    # intentionally selected an ALSA alias continue to work even though those
+    # aliases are hidden from the normal Settings dropdown.
+    devices = all_devices
     wanted = configured_name.casefold()
 
     # New configs store the selected full device name, so prefer an exact match.

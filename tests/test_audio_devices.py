@@ -26,7 +26,7 @@ class AudioDeviceDiscoveryTests(unittest.TestCase):
     @patch("vinylpi.core.audio_capture._default_input_index", return_value=1)
     @patch("vinylpi.core.audio_capture.sd.query_hostapis")
     @patch("vinylpi.core.audio_capture.sd.query_devices")
-    def test_list_audio_input_devices_filters_outputs_and_marks_default(
+    def test_list_audio_input_devices_hides_alsa_aliases_and_marks_default(
         self,
         query_devices,
         query_hostapis,
@@ -34,38 +34,69 @@ class AudioDeviceDiscoveryTests(unittest.TestCase):
     ):
         query_devices.return_value = [
             {
-                "name": "HDMI Output",
-                "max_input_channels": 0,
+                "name": "sysdefault",
+                "max_input_channels": 2,
                 "max_output_channels": 2,
                 "hostapi": 0,
-                "default_samplerate": 48000,
             },
             {
-                "name": "USB Audio Interface",
+                "name": "USB AUDIO CODEC: Audio (hw:0,0)",
                 "max_input_channels": 1,
                 "max_output_channels": 2,
                 "hostapi": 0,
-                "default_samplerate": 44100,
+            },
+            {
+                "name": "spdif",
+                "max_input_channels": 2,
+                "max_output_channels": 2,
+                "hostapi": 0,
+            },
+            {
+                "name": "default",
+                "max_input_channels": 2,
+                "max_output_channels": 2,
+                "hostapi": 0,
             },
             {
                 "name": "Microphone",
                 "max_input_channels": 2,
                 "max_output_channels": 0,
                 "hostapi": 1,
-                "default_samplerate": 48000,
             },
         ]
         query_hostapis.return_value = [{"name": "ALSA"}, {"name": "PulseAudio"}]
 
         devices = audio_capture.list_audio_input_devices()
 
-        self.assertEqual([item["name"] for item in devices], ["USB Audio Interface", "Microphone"])
+        self.assertEqual(
+            [item["name"] for item in devices],
+            ["USB AUDIO CODEC: Audio (hw:0,0)", "Microphone"],
+        )
+        self.assertEqual(devices[0]["display_name"], "USB AUDIO CODEC")
         self.assertTrue(devices[0]["is_default"])
-        self.assertFalse(devices[1]["is_default"])
+        self.assertFalse(devices[0]["is_virtual"])
         self.assertEqual(devices[0]["hostapi"], "ALSA")
-        self.assertEqual(devices[1]["max_input_channels"], 2)
 
-    @patch("vinylpi.core.audio_capture.list_audio_input_devices")
+    @patch("vinylpi.core.audio_capture._default_input_index", return_value=0)
+    @patch("vinylpi.core.audio_capture.sd.query_hostapis", return_value=[{"name": "ALSA"}])
+    @patch("vinylpi.core.audio_capture.sd.query_devices")
+    def test_virtual_inputs_remain_available_as_fallback_when_no_hardware_is_exposed(
+        self,
+        query_devices,
+        _query_hostapis,
+        _default_input,
+    ):
+        query_devices.return_value = [
+            {"name": "default", "max_input_channels": 2, "hostapi": 0},
+            {"name": "pulse", "max_input_channels": 2, "hostapi": 0},
+        ]
+
+        devices = audio_capture.list_audio_input_devices()
+
+        self.assertEqual([item["name"] for item in devices], ["default", "pulse"])
+        self.assertTrue(all(item["is_virtual"] for item in devices))
+
+    @patch("vinylpi.core.audio_capture._query_audio_input_devices")
     @patch("vinylpi.core.audio_capture.read_config")
     def test_selected_full_name_is_preferred(self, read_config, list_devices):
         read_config.return_value = {
@@ -73,13 +104,13 @@ class AudioDeviceDiscoveryTests(unittest.TestCase):
             "debug": {"logs": False},
         }
         list_devices.return_value = [
-            {"index": 2, "name": "USB Audio Interface", "is_default": True},
-            {"index": 5, "name": "Microphone", "is_default": False},
+            {"index": 2, "name": "USB Audio Interface", "is_default": True, "is_virtual": False},
+            {"index": 5, "name": "Microphone", "is_default": False, "is_virtual": False},
         ]
 
         self.assertEqual(audio_capture.auto_detect_usb_device(), 5)
 
-    @patch("vinylpi.core.audio_capture.list_audio_input_devices")
+    @patch("vinylpi.core.audio_capture._query_audio_input_devices")
     @patch("vinylpi.core.audio_capture.read_config")
     def test_legacy_substring_still_matches(self, read_config, list_devices):
         read_config.return_value = {
@@ -87,12 +118,12 @@ class AudioDeviceDiscoveryTests(unittest.TestCase):
             "debug": {"logs": False},
         }
         list_devices.return_value = [
-            {"index": 3, "name": "USB Audio Interface", "is_default": False},
+            {"index": 3, "name": "USB Audio Interface", "is_default": False, "is_virtual": False},
         ]
 
         self.assertEqual(audio_capture.auto_detect_usb_device(), 3)
 
-    @patch("vinylpi.core.audio_capture.list_audio_input_devices")
+    @patch("vinylpi.core.audio_capture._query_audio_input_devices")
     @patch("vinylpi.core.audio_capture.read_config")
     def test_empty_selection_uses_default_then_first(self, read_config, list_devices):
         read_config.return_value = {
@@ -100,14 +131,14 @@ class AudioDeviceDiscoveryTests(unittest.TestCase):
             "debug": {"logs": False},
         }
         list_devices.return_value = [
-            {"index": 1, "name": "Input A", "is_default": False},
-            {"index": 4, "name": "Input B", "is_default": True},
+            {"index": 1, "name": "Input A", "is_default": False, "is_virtual": False},
+            {"index": 4, "name": "Input B", "is_default": True, "is_virtual": False},
         ]
         self.assertEqual(audio_capture.auto_detect_usb_device(), 4)
 
         list_devices.return_value = [
-            {"index": 1, "name": "Input A", "is_default": False},
-            {"index": 4, "name": "Input B", "is_default": False},
+            {"index": 1, "name": "Input A", "is_default": False, "is_virtual": False},
+            {"index": 4, "name": "Input B", "is_default": False, "is_virtual": False},
         ]
         self.assertEqual(audio_capture.auto_detect_usb_device(), 1)
 
@@ -145,7 +176,12 @@ class ConsumerSettingsUiTests(unittest.TestCase):
 
         self.assertIn('<select id="audioDeviceName"', html)
         self.assertIn('id="refreshAudioDevices"', html)
+        self.assertIn('class="audio-device-control"', html)
+        self.assertIn('aria-label="Refresh audio devices"', html)
+        self.assertNotIn('>Device list</label>', html)
+        self.assertNotIn('id="refreshAudioDevices">Refresh</button>', html)
         self.assertIn('/api/audio-devices', js)
+        self.assertIn('device?.display_name || device?.name', js)
         self.assertNotIn('Device name contains', html)
 
     def test_settings_copy_is_hardware_agnostic(self):

@@ -26,10 +26,10 @@ function setAudioDeviceStatus(message = "") {
 }
 
 function audioDeviceLabel(device, disambiguate = false) {
-    const name = String(device?.name || "Audio input");
-    if (!disambiguate) return name;
+    const label = String(device?.display_name || device?.name || "Audio input");
+    if (!disambiguate) return label;
     const hostApi = String(device?.hostapi || "").trim();
-    return hostApi ? `${name} · ${hostApi}` : `${name} · device ${device?.index ?? "?"}`;
+    return hostApi ? `${label} · ${hostApi}` : `${label} · device ${device?.index ?? "?"}`;
 }
 
 function populateAudioDeviceSelect(devices, configuredName = "") {
@@ -47,14 +47,14 @@ function populateAudioDeviceSelect(devices, configuredName = "") {
 
     const nameCounts = new Map();
     devices.forEach((device) => {
-        const key = String(device?.name || "").toLocaleLowerCase();
+        const key = String(device?.display_name || device?.name || "").toLocaleLowerCase();
         nameCounts.set(key, (nameCounts.get(key) || 0) + 1);
     });
 
     devices.forEach((device) => {
         const option = document.createElement("option");
         option.value = String(device.name || "");
-        const key = option.value.toLocaleLowerCase();
+        const key = String(device?.display_name || device?.name || "").toLocaleLowerCase();
         option.textContent = audioDeviceLabel(device, (nameCounts.get(key) || 0) > 1);
         select.appendChild(option);
     });
