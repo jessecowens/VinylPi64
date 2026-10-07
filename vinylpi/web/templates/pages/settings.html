@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261005b" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261007a" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}" defer></script>
 {% endblock %}
 
@@ -75,8 +75,8 @@
         <div class="settings-grid">
             <div class="settings-panels">
 
-                <section class="card settings-card is-open" id="section-audio">
-                    <button class="settings-card-header" type="button" aria-expanded="true">
+                <section class="card settings-card" id="section-audio">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
                         <span class="settings-card-title">
                             <h2>Audio</h2>
                             <span>Input device and sample capture</span>
@@ -210,8 +210,8 @@
                     </div>
                 </section>
 
-                <section class="card settings-card is-open" id="section-display">
-                    <button class="settings-card-header" type="button" aria-expanded="true">
+                <section class="card settings-card" id="section-display">
+                    <button class="settings-card-header" type="button" aria-expanded="false">
                         <span class="settings-card-title">
                             <h2>Display / Image</h2>
                             <span>Pixel canvas, cover, text and colors</span>

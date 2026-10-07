@@ -1460,16 +1460,59 @@ if (resetBtn) {
     });
 }
 
-// Desktop accordion behavior. Mobile uses the category-first navigation and
-// keeps the selected category permanently expanded.
+// Desktop accordion behavior. Keep the user's open/closed sections across
+// reloads. On a browser with no saved preference, all sections start closed.
+// Mobile uses the category-first navigation and does not write accordion state.
 document.addEventListener("DOMContentLoaded", () => {
+    const storageKey = "vinylpi.settings.openSections";
+    const cards = Array.from(document.querySelectorAll(".settings-card"));
+    const isDesktopSettings = () => !window.matchMedia("(max-width: 900px)").matches;
+
+    const setCardOpen = (card, isOpen) => {
+        card.classList.toggle("is-open", isOpen);
+        card.querySelector(".settings-card-header")?.setAttribute("aria-expanded", String(isOpen));
+    };
+
+    const restoreAccordionState = () => {
+        if (!isDesktopSettings()) return;
+
+        let openIds = [];
+        try {
+            const stored = window.localStorage.getItem(storageKey);
+            const parsed = stored ? JSON.parse(stored) : [];
+            if (Array.isArray(parsed)) {
+                openIds = parsed.filter((value) => typeof value === "string");
+            }
+        } catch (error) {
+            console.debug("Could not restore settings accordion state.", error);
+        }
+
+        const openSet = new Set(openIds);
+        cards.forEach((card) => setCardOpen(card, Boolean(card.id && openSet.has(card.id))));
+    };
+
+    const saveAccordionState = () => {
+        if (!isDesktopSettings()) return;
+        const openIds = cards
+            .filter((card) => card.id && card.classList.contains("is-open"))
+            .map((card) => card.id);
+        try {
+            window.localStorage.setItem(storageKey, JSON.stringify(openIds));
+        } catch (error) {
+            console.debug("Could not save settings accordion state.", error);
+        }
+    };
+
+    restoreAccordionState();
+
     document.querySelectorAll(".settings-card-header").forEach((btn) => {
         btn.addEventListener("click", () => {
-            if (window.matchMedia("(max-width: 900px)").matches) return;
+            if (!isDesktopSettings()) return;
             const card = btn.closest(".settings-card");
             if (!card) return;
-            const isOpen = card.classList.toggle("is-open");
-            btn.setAttribute("aria-expanded", String(isOpen));
+            const isOpen = !card.classList.contains("is-open");
+            setCardOpen(card, isOpen);
+            saveAccordionState();
         });
     });
 });
