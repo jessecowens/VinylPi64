@@ -86,6 +86,11 @@ def variant_score(title: str, album: str | None) -> int:
 
     return score
 
+def normalize_album_name(value: str | None) -> str:
+    """Compare album identities without changing the spelling shown to users."""
+    return (value or "").strip().casefold()
+
+
 def is_live_variant(title: str, album: str | None) -> bool:
     t = (title or "").lower()
     a = (album or "").lower()

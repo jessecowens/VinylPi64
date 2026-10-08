@@ -13,6 +13,7 @@ from vinylpi.core.discogs_db import (
     get_release_tracks,
     get_track_counts,
     normalize_artist,
+    display_artist_name,
     normalize_text,
 )
 from vinylpi.core.image_utils import load_image
@@ -133,7 +134,13 @@ def _score_candidate(
     )
     if compact_equivalent or lead_equivalent:
         title_similarity = 1.0
-    artist_similarity = _similarity(artist_norm, str(candidate.get("normalized_artist") or ""))
+    # Recompute from the artist name: legacy local DBs may have stored
+    # 'smiths the' as normalized_artist, whereas new rows use 'the smiths'.
+    candidate_artist = candidate.get("track_artist") or candidate.get("release_artist")
+    artist_similarity = _similarity(
+        artist_norm,
+        normalize_artist(candidate_artist) if candidate_artist else str(candidate.get("normalized_artist") or ""),
+    )
     album_similarity = _similarity(album_norm, normalize_text(candidate.get("release_title")))
 
     candidate_variant_tags = _variant_tags(
@@ -363,7 +370,7 @@ def apply_discogs_match(
     )
     original = f"{track.artist} – {track.title} [{track.album or '-'}]"
 
-    track.artist = str(best.get("track_artist") or best.get("release_artist") or track.artist)
+    track.artist = display_artist_name(best.get("track_artist") or best.get("release_artist") or track.artist)
     track.title = str(best.get("track_title") or track.title)
     track.album = str(best.get("release_title") or track.album or "") or None
     if not track.duration_ms and best.get("duration_seconds"):
@@ -389,7 +396,7 @@ def apply_discogs_match(
     track.discogs_catalog_number = best.get("catalog_number")
     if next_track:
         track.discogs_expected_next_title = next_track.get("track_title")
-        track.discogs_expected_next_artist = next_track.get("track_artist")
+        track.discogs_expected_next_artist = display_artist_name(next_track.get("track_artist"))
         track.discogs_expected_next_position = next_track.get("position")
         track.discogs_expected_next_side = next_track.get("side")
 
@@ -532,7 +539,7 @@ def get_side_flip_prompt(
                 "from_side": state.current_side,
                 "to_side": next_track.get("side"),
                 "next_title": next_track.get("track_title"),
-                "next_artist": next_track.get("track_artist"),
+                "next_artist": display_artist_name(next_track.get("track_artist")),
                 "next_position": next_track.get("position"),
                 "release_id": state.active_release_id,
             }
@@ -565,7 +572,7 @@ def get_side_flip_prompt(
             "from_side": current_side,
             "to_side": next_side,
             "next_title": status.get("discogs_expected_next_title"),
-            "next_artist": status.get("discogs_expected_next_artist"),
+            "next_artist": display_artist_name(status.get("discogs_expected_next_artist")),
             "next_position": status.get("discogs_expected_next_position"),
             "release_id": int(status_release_id),
         }
@@ -640,7 +647,7 @@ def infer_expected_next_track(
     )
     after_next = get_next_track(int(next_track["release_id"]), next_index)
     inferred = RecognizedTrack(
-        artist=str(next_track.get("track_artist") or next_track.get("release_artist") or "Unknown artist"),
+        artist=display_artist_name(next_track.get("track_artist") or next_track.get("release_artist") or "Unknown artist"),
         title=str(next_track.get("track_title") or "Unknown track"),
         cover_image=cover_image,
         album=str(next_track.get("release_title") or "") or None,
@@ -666,7 +673,7 @@ def infer_expected_next_track(
     inferred.discogs_catalog_number = next_track.get("catalog_number")
     if after_next:
         inferred.discogs_expected_next_title = after_next.get("track_title")
-        inferred.discogs_expected_next_artist = after_next.get("track_artist")
+        inferred.discogs_expected_next_artist = display_artist_name(after_next.get("track_artist"))
         inferred.discogs_expected_next_position = after_next.get("position")
         inferred.discogs_expected_next_side = after_next.get("side")
 

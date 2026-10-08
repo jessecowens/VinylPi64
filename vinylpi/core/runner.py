@@ -23,6 +23,7 @@ from vinylpi.core.loop_logic import (
     handle_song_result,
     maybe_add_listen_time,
     restore_last_vinyl_song,
+    should_ignore_live_album_mismatch,
     start_or_replace_timed_listen,
     update_album_session_on_switch,
     update_song_stats_on_switch,
@@ -38,7 +39,6 @@ from vinylpi.core.loop_state import (
 from vinylpi.core.recognition import recognize_song
 from vinylpi.core.storage import initialize_storage
 from vinylpi.core.stats_db import add_pickup_usage_seconds
-from vinylpi.core.title_variants import is_live_variant
 from vinylpi.config.runtime import read_config
 
 MIN_TRACKS_FOR_ALBUM_SESSION = 2
@@ -188,6 +188,11 @@ def main_loop() -> None:
                 time.sleep(cfg.delay)
                 continue
 
+            # A real Shazam result ends the consecutive *recognition failure*
+            # streak, even if the variant filter later chooses not to display
+            # that particular candidate. Only track=None enters fallback logic.
+            display_state.consecutive_failures = 0
+
             track = apply_discogs_match(
                 track,
                 discogs_state,
@@ -202,31 +207,16 @@ def main_loop() -> None:
             )
             if album_locked and track.album:
                 locked_album = album_state.current_album or ""
-                if (
-                    track.album.strip() != locked_album.strip()
-                    and is_live_variant(track.title, track.album)
-                ):
+                if should_ignore_live_album_mismatch(track.title, track.album, locked_album):
                     if cfg.debug_log:
                         print(
                             "Ignoring live/unplugged mismatch: "
                             f"detected album='{track.album}', "
                             f"locked album='{locked_album}', title='{track.title}'"
                         )
-                    side_flip_prompt = get_side_flip_prompt(
-                        discogs_state,
-                        raw_cfg,
-                        consecutive_failures=display_state.consecutive_failures + 1,
-                        debug_log=cfg.debug_log,
-                    )
-                    if handle_no_result(
-                        cfg,
-                        display_state,
-                        cfg_reloaded,
-                        side_flip_prompt=side_flip_prompt,
-                    ):
-                        if cfg.debug_log:
-                            print("Vinyl auto-sleep reached; stopping recognition worker.")
-                        break
+                    # Variant rejected != Shazam failed. Preserve the current
+                    # cover and statistics; do not trigger fallback, side-flip
+                    # prompts, adaptive-sampling escalation or auto-sleep.
                     time.sleep(cfg.delay)
                     continue
 

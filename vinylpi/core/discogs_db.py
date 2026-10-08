@@ -11,6 +11,20 @@ from vinylpi.core.title_variants import canonicalize_title
 
 _DISCOGS_ARTIST_SUFFIX = re.compile(r"\s*\(\d+\)\s*$")
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
+_SORTED_ARTICLE = re.compile(
+    r"^(?P<artist>.+?)\s*[,;]\s*(?P<article>the|an|a)(?P<suffix>\s*\(\d+\))?\s*$", re.IGNORECASE,
+)
+
+
+def display_artist_name(value: str | None) -> str:
+    """Convert legacy Discogs sort names ("Smiths; The") to display names.
+
+    No database migration is needed: older releases and tracks are normalized
+    as they are read. Unrelated artist names remain untouched.
+    """
+    name = (value or "").strip()
+    match = _SORTED_ARTICLE.fullmatch(name)
+    return f"{match.group('article')} {match.group('artist')}{match.group('suffix') or ''}" if match else name
 
 
 def normalize_text(value: str | None) -> str:
@@ -23,6 +37,7 @@ def normalize_text(value: str | None) -> str:
 
 def normalize_artist(value: str | None) -> str:
     text = _DISCOGS_ARTIST_SUFFIX.sub("", value or "")
+    text = display_artist_name(text)
     text = re.sub(r"\s+(feat\.?|ft\.?|featuring)\s+.*$", "", text, flags=re.IGNORECASE)
     return normalize_text(text)
 
@@ -57,7 +72,7 @@ def upsert_release_summary(data: dict[str, Any]) -> None:
                 data.get("instance_id"),
                 data.get("folder_id"),
                 data.get("title") or "Unknown release",
-                data.get("artist") or "Unknown artist",
+                display_artist_name(data.get("artist")) or "Unknown artist",
                 data.get("year"),
                 data.get("country"),
                 data.get("label"),
@@ -105,7 +120,7 @@ def replace_release_details(release: dict[str, Any], tracks: Iterable[dict[str, 
                 release.get("instance_id"),
                 release.get("folder_id"),
                 release.get("title") or "Unknown release",
-                release.get("artist") or "Unknown artist",
+                display_artist_name(release.get("artist")) or "Unknown artist",
                 release.get("year"),
                 release.get("country"),
                 release.get("label"),
@@ -132,7 +147,7 @@ def replace_release_details(release: dict[str, Any], tracks: Iterable[dict[str, 
                     track.get("position"),
                     track.get("side"),
                     track.get("title") or "Unknown track",
-                    track.get("artist") or release.get("artist") or "Unknown artist",
+                    display_artist_name(track.get("artist") or release.get("artist")) or "Unknown artist",
                     track.get("duration_seconds"),
                     normalize_text(canonicalize_title(track.get("title") or "")),
                     normalize_artist(track.get("artist") or release.get("artist")),
@@ -248,7 +263,24 @@ def get_random_release(exclude_release_id: int | None = None) -> dict[str, Any] 
             """,
             (exclude_release_id,),
         ).fetchone()
-    return dict(row) if row else None
+    if not row:
+        return None
+    result = dict(row)
+    result["artist"] = display_artist_name(result.get("artist"))
+    return result
+
+
+def _track_row(row: Any) -> dict[str, Any]:
+    """Return artist names in display order, including pre-fix cached rows."""
+    result = dict(row)
+    result["track_artist"] = display_artist_name(result.get("track_artist"))
+    result["release_artist"] = display_artist_name(result.get("release_artist"))
+    # Old DBs also hold an obsolete normalized_artist ('smiths the'). Derive
+    # it from the display name so matching stays correct without a resync.
+    result["normalized_artist"] = normalize_artist(
+        result.get("track_artist") or result.get("release_artist")
+    )
+    return result
 
 
 _TRACK_SELECT = """
@@ -272,7 +304,7 @@ def find_exact_title_tracks(normalized_title: str, limit: int = 100) -> list[dic
             _TRACK_SELECT + " WHERE t.normalized_title = ? ORDER BY t.release_id, t.track_index LIMIT ?",
             (normalized_title, int(limit)),
         ).fetchall()
-    return [{key: row[key] for key in row.keys()} for row in rows]
+    return [_track_row(row) for row in rows]
 
 
 def find_compact_title_tracks(normalized_title: str, limit: int = 100) -> list[dict[str, Any]]:
@@ -293,7 +325,7 @@ def find_compact_title_tracks(normalized_title: str, limit: int = 100) -> list[d
               "ORDER BY t.release_id, t.track_index LIMIT ?",
             (compact_title, int(limit)),
         ).fetchall()
-    return [{key: row[key] for key in row.keys()} for row in rows]
+    return [_track_row(row) for row in rows]
 
 
 def get_release_tracks(release_id: int) -> list[dict[str, Any]]:
@@ -303,7 +335,7 @@ def get_release_tracks(release_id: int) -> list[dict[str, Any]]:
             _TRACK_SELECT + " WHERE t.release_id = ? ORDER BY t.track_index",
             (int(release_id),),
         ).fetchall()
-    return [{key: row[key] for key in row.keys()} for row in rows]
+    return [_track_row(row) for row in rows]
 
 
 def get_release_track(release_id: int, track_index: int) -> dict[str, Any] | None:
@@ -313,7 +345,7 @@ def get_release_track(release_id: int, track_index: int) -> dict[str, Any] | Non
             _TRACK_SELECT + " WHERE t.release_id = ? AND t.track_index = ?",
             (int(release_id), int(track_index)),
         ).fetchone()
-    return {key: row[key] for key in row.keys()} if row else None
+    return _track_row(row) if row else None
 
 
 def get_next_track(release_id: int, track_index: int) -> dict[str, Any] | None:
@@ -324,7 +356,7 @@ def get_next_track(release_id: int, track_index: int) -> dict[str, Any] | None:
             + " WHERE t.release_id = ? AND t.track_index > ? ORDER BY t.track_index LIMIT 1",
             (int(release_id), int(track_index)),
         ).fetchone()
-    return {key: row[key] for key in row.keys()} if row else None
+    return _track_row(row) if row else None
 
 
 def get_track_counts(release_id: int, track_index: int, side: str | None) -> dict[str, int]:

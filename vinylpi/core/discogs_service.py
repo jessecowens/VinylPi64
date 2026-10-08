@@ -23,6 +23,7 @@ from vinylpi.core.discogs_db import (
     replace_release_details,
     set_sync_state,
     upsert_release_summary,
+    display_artist_name,
 )
 from vinylpi.integrations.discogs_client import DiscogsClient, DiscogsError
 
@@ -40,7 +41,7 @@ def get_discogs_token(cfg: dict[str, Any] | None = None) -> str:
 
 def _artist_name(value: dict[str, Any]) -> str:
     name = str(value.get("name") or "").strip()
-    return name
+    return display_artist_name(name)
 
 
 def _join_artists(values: Any, fallback: str = "Unknown artist") -> str:
@@ -48,7 +49,13 @@ def _join_artists(values: Any, fallback: str = "Unknown artist") -> str:
         return fallback
     names = [_artist_name(value) for value in values if isinstance(value, dict)]
     names = [name for name in names if name]
-    return ", ".join(names) if names else fallback
+    return ", ".join(names) if names else display_artist_name(fallback)
+
+
+def _preferred_artist_name(artists: Any, sort_name: str | None, fallback: str) -> str:
+    """Discogs artists[].name is a display name; artists_sort is only a fallback."""
+    names = _join_artists(artists, "")
+    return names or display_artist_name(sort_name) or display_artist_name(fallback)
 
 
 def _format_text(formats: Any) -> str:
@@ -123,7 +130,7 @@ def collection_summary(entry: dict[str, Any]) -> dict[str, Any]:
         "instance_id": entry.get("instance_id"),
         "folder_id": entry.get("folder_id"),
         "title": str(basic.get("title") or "Unknown release"),
-        "artist": str(basic.get("artists_sort") or _join_artists(artists)),
+        "artist": _preferred_artist_name(artists, basic.get("artists_sort"), "Unknown artist"),
         "year": basic.get("year") or None,
         "country": basic.get("country") or None,
         "label": first_label.get("name"),
@@ -141,9 +148,9 @@ def parse_release_details(
     details: dict[str, Any],
     summary: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    release_artist = str(
-        details.get("artists_sort")
-        or _join_artists(details.get("artists"), summary.get("artist") or "Unknown artist")
+    release_artist = _preferred_artist_name(
+        details.get("artists"), details.get("artists_sort"),
+        summary.get("artist") or "Unknown artist",
     )
     labels = details.get("labels") or []
     first_label = labels[0] if labels and isinstance(labels[0], dict) else {}
@@ -178,9 +185,8 @@ def parse_release_details(
         if not title:
             return
         position = str(track.get("position") or inherited_position or "").strip()
-        track_artist = str(
-            track.get("artists_sort")
-            or _join_artists(track.get("artists"), release_artist)
+        track_artist = _preferred_artist_name(
+            track.get("artists"), track.get("artists_sort"), release_artist,
         )
         tracks.append(
             {

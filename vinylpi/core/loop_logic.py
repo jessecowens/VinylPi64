@@ -14,7 +14,9 @@ from vinylpi.core.statistics import (
     add_measured_listen_time_seconds,
 )
 from vinylpi.core.status import clear_side_flip_prompt, get_last_source_status, write_side_flip_prompt, write_status
-from vinylpi.core.title_variants import canonicalize_title, variant_score
+from vinylpi.core.title_variants import (
+    canonicalize_title, is_live_variant, normalize_album_name, variant_score,
+)
 from vinylpi.integrations.home_assistant import send_rgb
 
 
@@ -38,6 +40,22 @@ def log_pixoo_update_reason(
         print("Config changed and a new song was detected, updating Pixoo.")
     else:
         print("New song detected, updating Pixoo.")
+
+
+def should_ignore_live_album_mismatch(
+    title: str, album: str | None, locked_album: str | None,
+) -> bool:
+    """Reject a live variant only when it belongs to a *different* album.
+
+    Differences in capitalization (such as "Of" vs "of") are not different
+    releases; the same album must remain eligible for display and statistics.
+    """
+    return bool(
+        normalize_album_name(album)
+        and normalize_album_name(locked_album)
+        and normalize_album_name(album) != normalize_album_name(locked_album)
+        and is_live_variant(title, album)
+    )
 
 
 def handle_no_result(
@@ -370,12 +388,12 @@ def update_album_session_on_switch(
         st.current_album_session_counted = False
         st.candidate_album = None
         st.candidate_streak = 0
-    elif album_key == st.current_album:
+    elif normalize_album_name(album_key) == normalize_album_name(st.current_album):
         st.current_album_unique_tracks.add(title)
         st.candidate_album = None
         st.candidate_streak = 0
     else:
-        if st.candidate_album == album_key:
+        if normalize_album_name(st.candidate_album) == normalize_album_name(album_key):
             st.candidate_streak += 1
         else:
             st.candidate_album = album_key
@@ -395,7 +413,7 @@ def update_album_session_on_switch(
             st.candidate_streak = 0
 
     if (
-        st.current_album == album_key
+        normalize_album_name(st.current_album) == normalize_album_name(album_key)
         and not st.current_album_session_counted
         and len(st.current_album_unique_tracks) >= min_tracks
     ):
