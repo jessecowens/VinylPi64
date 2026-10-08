@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Iterator
+from urllib.parse import quote
 from typing import Any
 
 import requests
@@ -87,6 +88,14 @@ class DiscogsClient:
 
     def identity(self) -> dict[str, Any]:
         return self._get("/oauth/identity")
+
+    def get_collection_folders(self, username: str) -> list[dict[str, Any]]:
+        """Load folder IDs and display names without re-syncing the collection."""
+        payload = self._get(f"/users/{quote(username, safe='')}/collection/folders")
+        folders = payload.get("folders")
+        if not isinstance(folders, list):
+            raise DiscogsError("Discogs returned an invalid folder list.")
+        return [folder for folder in folders if isinstance(folder, dict)]
 
     def iter_collection_releases(
         self,

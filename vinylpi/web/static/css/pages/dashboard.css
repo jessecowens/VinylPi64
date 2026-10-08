@@ -250,9 +250,15 @@ body.random-record-open { overflow: hidden; }
     box-shadow: 0 24px 80px rgba(0,0,0,.6);
 }
 .random-record-dialog::backdrop { background: rgba(4,4,9,.76); backdrop-filter: blur(5px); }
-.random-record-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
-.random-record-header .eyebrow { color: #f49bcc; font-size: 11px; letter-spacing: .13em; }
-.random-record-header h2 { margin: 6px 0 0; font-size: 22px; line-height: 1.2; letter-spacing: -.025em; }
+.random-record-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.random-record-header h2 { margin: 2px 0 0; font-size: 22px; line-height: 1.2; letter-spacing: -.025em; }
+.random-record-folder { margin: 0 0 20px; }
+.random-record-folder label { display: block; margin: 0 0 7px; color: #f49bcc; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
+.random-record-folder-select-wrap { position: relative; }
+.random-record-folder-select-wrap::after { content: ""; position: absolute; right: 17px; top: calc(50% - 4px); width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); pointer-events: none; }
+.random-record-folder select { display: block; width: 100%; min-height: 44px; appearance: none; padding: 10px 42px 10px 14px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer; }
+.random-record-folder select:focus-visible { outline: 2px solid #f49bcc; outline-offset: 2px; }
+.random-record-folder select option { background: #24212e; color: #fff; }
 .random-record-close { width: 36px; min-height: 36px; border-radius: 10px; background: rgba(255,255,255,.035); }
 .random-record-result { text-align: center; }
 .random-record-art {

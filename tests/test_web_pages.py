@@ -111,6 +111,9 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertIn('<dialog id="random-record-dialog"', html)
         self.assertIn('aria-labelledby="random-record-heading"', html)
         self.assertIn('id="random-record-cover"', html)
+        self.assertIn('id="random-record-folder-select"', html)
+        self.assertIn('for="random-record-folder-select"', html)
+        self.assertNotIn('Your collection</div>', html)
         self.assertIn('id="random-record-reroll"', html)
         self.assertIn('aria-label="Close record suggestion"', html)
 

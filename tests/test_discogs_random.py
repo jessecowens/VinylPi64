@@ -115,6 +115,56 @@ class RandomRecordTests(unittest.TestCase):
         self.assertFalse(response.get_json()["ok"])
         select.assert_not_called()
 
+    def test_api_filters_folders_and_rejects_invalid_ids(self):
+        self.add_release(1, folder_id=10)
+        self.add_release(2, folder_id=20)
+        self.add_release(3, folder_id=10)
+        selected = self.client.get("/api/discogs/random?folder_id=10&exclude_release_id=1")
+        self.assertEqual(selected.status_code, 200)
+        self.assertEqual(selected.get_json()["release"]["release_id"], 3)
+        self.assertEqual(selected.get_json()["release"]["collection_count"], 2)
+        self.assertTrue(selected.cache_control.no_store)
+        self.assertIsNone(self.client.get("/api/discogs/random?folder_id=999").get_json()["release"])
+        for invalid in ("", "foo", "-1", "1.5", "1 OR 1=1", str(2**63)):
+            with self.subTest(invalid=invalid):
+                response = self.client.get("/api/discogs/random", query_string={"folder_id": invalid})
+                self.assertEqual(response.status_code, 400)
+                self.assertFalse(response.get_json()["ok"])
+
+    def test_folder_api_fetches_discogs_names_once_and_caches_per_profile(self):
+        from vinylpi.core.discogs_db import set_sync_state
+        self.add_release(1, folder_id=10)
+        self.add_release(2, folder_id=20)
+        set_sync_state(username="example", status="complete")
+        with patch("vinylpi.web.routes.discogs_api.get_discogs_token", return_value="a-token"), \
+             patch("vinylpi.web.routes.discogs_api.DiscogsClient") as client:
+            client.return_value.get_collection_folders.return_value = [
+                {"id": 0, "name": "All"}, {"id": 1, "name": "Uncategorized"},
+                {"id": 10, "name": "Alte Sammlung"}, {"id": 20, "name": "Meine Sammlung"},
+            ]
+            response = self.client.get("/api/discogs/folders")
+            self.assertEqual(response.status_code, 200)
+            folders = response.get_json()["folders"]
+            self.assertEqual([(f["name"], f["count"]) for f in folders], [
+                ("All records", 2), ("Alte Sammlung", 1),
+                ("Meine Sammlung", 1), ("Uncategorized", 0),
+            ])
+            self.assertTrue(response.cache_control.no_store)
+            self.client.get("/api/discogs/folders")
+            client.return_value.get_collection_folders.assert_called_once_with("example")
+
+    def test_folder_api_offline_fallback_and_spotify_block(self):
+        self.add_release(1, folder_id=22)
+        with patch("vinylpi.web.routes.discogs_api.get_discogs_token", return_value=""):
+            response = self.client.get("/api/discogs/folders")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["folders"], [
+            {"id": 0, "name": "All records", "count": 1},
+            {"id": 22, "name": "Folder 22", "count": 1},
+        ])
+        self.mode.return_value = "spotify"
+        self.assertEqual(self.client.get("/api/discogs/folders").status_code, 409)
+
     def test_browser_sessions_only_receive_their_own_collection(self):
         self.add_release(1, title="Profile A album")
         token = set_profile_storage_override("profile-b")

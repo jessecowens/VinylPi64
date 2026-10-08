@@ -8,7 +8,7 @@ from vinylpi.paths import DB_PATH, get_active_db_path
 
 _LEGACY_DB_PATH = DB_PATH
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 _INIT_LOCK = threading.Lock()
 _INITIALIZED_PATHS: set[str] = set()
 
@@ -200,6 +200,15 @@ def _create_schema(conn: sqlite3.Connection) -> None:
             synced_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
         );
 
+        -- Folder names are fetched separately from Discogs, not during a full
+        -- collection sync. They stay in the active profile's own database.
+        CREATE TABLE IF NOT EXISTS discogs_folders (
+            folder_id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL,
+            name TEXT NOT NULL,
+            fetched_at INTEGER NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS discogs_tracks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             release_id INTEGER NOT NULL REFERENCES discogs_releases(release_id) ON DELETE CASCADE,
@@ -318,6 +327,15 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
             date_added TEXT,
             details_loaded INTEGER NOT NULL DEFAULT 0,
             synced_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        -- Folder names are fetched separately from Discogs, not during a full
+        -- collection sync. They stay in the active profile's own database.
+        CREATE TABLE IF NOT EXISTS discogs_folders (
+            folder_id INTEGER PRIMARY KEY,
+            username TEXT NOT NULL,
+            name TEXT NOT NULL,
+            fetched_at INTEGER NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS discogs_tracks (

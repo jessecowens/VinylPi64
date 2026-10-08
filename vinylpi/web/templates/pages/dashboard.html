@@ -3,14 +3,14 @@
 {% block title %}VinylPi Dashboard{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20261008b">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20261008c">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
 {% block page_scripts %}
     <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}?v=20260925b" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_dashboard.js') }}?v=20261008a" defer></script>
-    <script src="{{ url_for('static', filename='js/pages/random_record.js') }}?v=20261008a" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/random_record.js') }}?v=20261008b" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -146,7 +146,6 @@
 <dialog id="random-record-dialog" class="random-record-dialog" aria-labelledby="random-record-heading">
     <div class="random-record-header">
         <div>
-            <div class="eyebrow">Your collection</div>
             <h2 id="random-record-heading">What should I play?</h2>
         </div>
         <button id="random-record-close" class="random-record-close" type="button" aria-label="Close record suggestion" autofocus>
@@ -154,6 +153,14 @@
                 <path d="m6 6 12 12M18 6 6 18"></path>
             </svg>
         </button>
+    </div>
+    <div class="random-record-folder">
+        <label for="random-record-folder-select">Discogs folder</label>
+        <div class="random-record-folder-select-wrap">
+            <select id="random-record-folder-select" aria-label="Choose Discogs collection folder">
+                <option value="0">All records</option>
+            </select>
+        </div>
     </div>
     <div id="random-record-result" class="random-record-result hidden">
         <div class="random-record-art">

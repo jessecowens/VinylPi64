@@ -244,24 +244,110 @@ def get_collection_counts() -> dict[str, int]:
     return {"releases": int(row["releases"] or 0), "tracks": int(row["tracks"] or 0)}
 
 
-def get_random_release(exclude_release_id: int | None = None) -> dict[str, Any] | None:
-    """Pick from the current profile's collection, avoiding an immediate repeat.
+def get_collection_folders(username: str = "") -> list[dict[str, Any]]:
+    """List locally selectable Discogs folders, including folders with no records.
 
-    The previous release sorts last, so a one-record collection still works.
-    Summaries are sufficient; a release need not have imported track details.
+    Folder 0 is Discogs' virtual "All" folder and folder 1 represents
+    uncategorized entries. Older collection rows without an ID are treated as
+    uncategorized. Counts reflect locally indexed *unique releases*.
     """
     init_db()
     with get_connection() as conn:
+        counts = {
+            int(row["folder_id"]): int(row["record_count"])
+            for row in conn.execute(
+                """SELECT COALESCE(folder_id, 1) AS folder_id, COUNT(*) AS record_count
+                   FROM discogs_releases GROUP BY COALESCE(folder_id, 1)"""
+            ).fetchall()
+        }
+        total = sum(counts.values())
+        names = {
+            int(row["folder_id"]): str(row["name"])
+            for row in conn.execute(
+                "SELECT folder_id, name FROM discogs_folders WHERE username = ? COLLATE NOCASE",
+                (username,),
+            ).fetchall()
+        } if username else {}
+
+    # Include known empty folders. Omit the virtual All folder from the
+    # per-folder list; it is represented by the first entry below.
+    folder_ids = (set(counts) | set(names)) - {0}
+    folders = [{"id": 0, "name": "All records", "count": total}]
+    entries = [
+        {"id": folder_id, "name": names.get(folder_id) or (
+            "Uncategorized" if folder_id == 1 else f"Folder {folder_id}"
+        ), "count": counts.get(folder_id, 0)}
+        for folder_id in folder_ids
+    ]
+    entries.sort(key=lambda item: (item["id"] == 1, item["name"].casefold(), item["id"]))
+    return folders + entries
+
+
+def get_cached_collection_folder_timestamp(username: str) -> int | None:
+    """Return the age marker for the last successful folder-name lookup."""
+    if not username:
+        return None
+    init_db()
+    with get_connection() as conn:
         row = conn.execute(
-            """
+            "SELECT MAX(fetched_at) AS fetched_at FROM discogs_folders WHERE username = ? COLLATE NOCASE",
+            (username,),
+        ).fetchone()
+    return int(row["fetched_at"]) if row and row["fetched_at"] is not None else None
+
+
+def save_collection_folder_names(username: str, folders: list[dict[str, Any]]) -> None:
+    """Cache Discogs folder labels without changing the synced release data."""
+    if not username or not folders:
+        return
+    now = int(time.time())
+    names = []
+    for folder in folders:
+        try:
+            folder_id = int(folder["id"])
+            name = str(folder.get("name") or "").strip()
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+        if 0 <= folder_id <= 9223372036854775807 and name:
+            names.append((folder_id, username, name, now))
+    if not names:
+        return
+    init_db()
+    with get_connection() as conn:
+        # The database is profile-scoped. Invalidate labels from an old account
+        # if this profile was connected to a different Discogs account.
+        conn.execute("DELETE FROM discogs_folders")
+        conn.executemany(
+            "INSERT INTO discogs_folders (folder_id, username, name, fetched_at) VALUES (?, ?, ?, ?)",
+            names,
+        )
+
+
+def get_random_release(
+    exclude_release_id: int | None = None,
+    folder_id: int | None = None,
+) -> dict[str, Any] | None:
+    """Pick a release from a folder, avoiding an immediate repeat if possible.
+
+    ``None`` or Discogs folder 0 selects all records; a nonzero ID restricts
+    both the choice and collection_count to that folder. No network calls.
+    """
+    init_db()
+    folder_id = None if folder_id in (None, 0) else int(folder_id)
+    where = "" if folder_id is None else "WHERE COALESCE(folder_id, 1) = ?"
+    params = (exclude_release_id,) if folder_id is None else (folder_id, folder_id, exclude_release_id)
+    with get_connection() as conn:
+        row = conn.execute(
+            f"""
             SELECT release_id, title, artist,
                 COALESCE(NULLIF(cover_url, ''), thumb_url) AS cover_url,
-                (SELECT COUNT(*) FROM discogs_releases) AS collection_count
+                (SELECT COUNT(*) FROM discogs_releases {where}) AS collection_count
             FROM discogs_releases
+            {where}
             ORDER BY (release_id = ?), RANDOM()
             LIMIT 1
             """,
-            (exclude_release_id,),
+            params,
         ).fetchone()
     if not row:
         return None
