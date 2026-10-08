@@ -172,12 +172,15 @@ def handle_song_result(
         score=score,
     )
     is_same_song = song_id == disp.last_song_id
-    should_skip_pixoo = not should_update or (
-        is_same_song
-        and not disp.last_display_was_fallback
-        and not disp.last_display_was_inferred
-        and not cfg_reloaded
-        and not better_variant
+    # A settings change (notably Shazam/Discogs cover preference) must
+    # refresh the current song even if its title and variant score are equal.
+    should_skip_pixoo = not cfg_reloaded and (
+        not should_update or (
+            is_same_song
+            and not disp.last_display_was_fallback
+            and not disp.last_display_was_inferred
+            and not better_variant
+        )
     )
 
     if should_skip_pixoo:

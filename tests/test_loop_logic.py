@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import unittest
+from PIL import Image
+from vinylpi.core.models import RecognizedTrack
 from unittest.mock import patch
 
 from vinylpi.core.discogs_matcher import _is_turn_record_transition
 from vinylpi.core.loop_logic import (
     handle_no_result,
+    handle_song_result,
     should_update_display,
     update_album_session_on_switch,
     update_song_stats_on_switch,
@@ -116,6 +119,23 @@ class DisplayDecisionTests(unittest.TestCase):
         )
 
         self.assertEqual(result, (True, True))
+
+
+class CoverPreferenceRefreshTests(unittest.TestCase):
+    @patch("vinylpi.core.loop_logic.write_status")
+    @patch("vinylpi.core.loop_logic.send_rgb")
+    @patch("vinylpi.core.loop_logic.start_scrolling_display")
+    def test_config_reload_refreshes_same_song(self, scrolling, rgb, write_status):
+        track = RecognizedTrack(
+            artist="Artist", title="Song", album="Album",
+            cover_image=Image.new("RGB", (2, 2), "red"),
+            cover_url="https://example.com/shazam.png",
+        )
+        disp = DisplayState(last_song_id=("artist", "song"), last_song_variant_score=20)
+        result = handle_song_result(LoopConfig(), disp, True, track)
+        self.assertTrue(result["did_update_display"])
+        scrolling.assert_called_once()
+        write_status.assert_called_once()
 
 
 class NoResultTests(unittest.TestCase):

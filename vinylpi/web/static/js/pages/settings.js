@@ -1148,6 +1148,8 @@ async function loadConfig() {
     // DISCOGS
     document.getElementById("discogsEnabled").checked = !!discogs.enabled;
     document.getElementById("discogsPreferCollection").checked = discogs.prefer_collection !== false;
+    const preferredCover = discogs.cover_source === "discogs" ? "discogs" : "shazam";
+    document.querySelector(`input[name="discogsCoverSource"][value="${preferredCover}"]`).checked = true;
     document.getElementById("discogsSequenceMatching").checked = discogs.sequence_matching !== false;
     document.getElementById("discogsInferNext").checked = discogs.infer_unrecognized_next !== false;
     document.getElementById("discogsVinylOnly").checked = discogs.vinyl_only !== false;
@@ -1345,6 +1347,8 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     // DISCOGS
     discogs.enabled = document.getElementById("discogsEnabled").checked;
     discogs.prefer_collection = document.getElementById("discogsPreferCollection").checked;
+    discogs.cover_source = document.querySelector('input[name="discogsCoverSource"]:checked')?.value === "discogs"
+        ? "discogs" : "shazam";
     discogs.sequence_matching = document.getElementById("discogsSequenceMatching").checked;
     discogs.infer_unrecognized_next = document.getElementById("discogsInferNext").checked;
     discogs.vinyl_only = document.getElementById("discogsVinylOnly").checked;

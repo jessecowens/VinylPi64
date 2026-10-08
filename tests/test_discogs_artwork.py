@@ -23,7 +23,7 @@ class DiscogsArtworkTests(unittest.TestCase):
             cover_image=self.original, cover_url="https://example.com/shazam.png",
         )
 
-    def apply_match(self):
+    def apply_match(self, cover_source=None):
         candidate = {
             "release_id": 123, "track_index": 0,
             "normalized_title": "song", "normalized_artist": "artist",
@@ -42,16 +42,29 @@ class DiscogsArtworkTests(unittest.TestCase):
                 stack.enter_context(patch(
                     f"vinylpi.core.discogs_matcher.{name}", return_value=result
                 ))
+            config = {"enabled": True}
+            if cover_source is not None:
+                config["cover_source"] = cover_source
             return apply_discogs_match(
-                self.track, DiscogsPlaybackState(), {"discogs": {"enabled": True}}
+                self.track, DiscogsPlaybackState(), {"discogs": config}
             )
+
+    @patch("vinylpi.core.image_utils.requests.get")
+    def test_default_shazam_keeps_clean_artwork_but_discogs_metadata(self, get):
+        result = self.apply_match()
+        self.assertIs(result.cover_image, self.original)
+        self.assertEqual(result.cover_url, "https://example.com/shazam.png")
+        self.assertEqual(result.discogs_cover_url, self.url)
+        self.assertEqual(result.discogs_release_id, 123)
+        self.assertEqual(result.discogs_position, "A1")
+        get.assert_not_called()
 
     @patch("vinylpi.core.image_utils.requests.get")
     def test_success_replaces_shazam_artwork_and_caches_download(self, get):
         data = BytesIO()
         Image.new("RGB", (2, 2), "blue").save(data, format="PNG")
         get.return_value = Mock(content=data.getvalue())
-        result = self.apply_match()
+        result = self.apply_match(cover_source="discogs")
         self.assertEqual(result.cover_url, self.url)
         self.assertEqual(result.cover_image.getpixel((0, 0)), (0, 0, 255))
         self.assertIsNot(result.cover_image, _load_discogs_cover(self.url))
@@ -63,7 +76,7 @@ class DiscogsArtworkTests(unittest.TestCase):
     def test_403_keeps_shazam_artwork_and_does_not_cache_failure(self, get):
         get.return_value.raise_for_status.side_effect = requests.HTTPError("403 Forbidden")
         for _ in range(2):
-            result = self.apply_match()
+            result = self.apply_match(cover_source="discogs")
             self.assertIs(result.cover_image, self.original)
             self.assertEqual(result.cover_url, "https://example.com/shazam.png")
             self.assertEqual(result.discogs_release_id, 123)

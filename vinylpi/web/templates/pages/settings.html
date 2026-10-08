@@ -3,11 +3,11 @@
 {% block title %}VinylPi Settings{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261005b">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261008-cover">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261007a" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261008-cover" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}" defer></script>
 {% endblock %}
 
@@ -473,6 +473,14 @@
                             <div data-setting-row="discogs-details">
                                 <div class="form-row"><label for="discogsPreferCollection">Prefer collection matches</label><input type="checkbox" id="discogsPreferCollection"></div>
                                 <div class="form-hint">Prefer matching releases from your collection.</div>
+                                <div class="form-row cover-source-row">
+                                    <span id="discogsCoverSourceLabel" class="cover-source-label">Preferred album cover</span>
+                                    <div class="cover-source-segmented" role="radiogroup" aria-labelledby="discogsCoverSourceLabel">
+                                        <label><input type="radio" name="discogsCoverSource" value="shazam" checked><span>Shazam</span></label>
+                                        <label><input type="radio" name="discogsCoverSource" value="discogs"><span>Discogs</span></label>
+                                    </div>
+                                </div>
+                                <div class="form-hint">Shazam (default) uses the clean digital artwork; Discogs uses the image of your exact record pressing. Discogs matching and tracklist data work in both modes.</div>
                                 <div class="form-row"><label for="discogsSequenceMatching">Use record sequence</label><input type="checkbox" id="discogsSequenceMatching"></div>
                                 <div class="form-hint">Use track order to improve matching.</div>
                                 <div class="form-row"><label for="discogsInferNext">Estimate an unrecognized next track</label><input type="checkbox" id="discogsInferNext"></div>

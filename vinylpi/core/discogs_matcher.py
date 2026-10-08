@@ -393,11 +393,12 @@ def apply_discogs_match(
         track.discogs_expected_next_position = next_track.get("position")
         track.discogs_expected_next_side = next_track.get("side")
 
-    # A successful collection match should also stabilize the artwork.  Keeping
-    # Shazam's cover here meant that corrected Discogs metadata could still be
-    # shown with the cover of a cover/reupload or unrelated false positive.
+    # Discogs provides authoritative release metadata regardless of the cover
+    # preference. Shazam artwork is the default; Discogs artwork is opt-in.
+    # Download failures never replace the already available Shazam image.
     collection_cover_url = str(best.get("cover_url") or "").strip()
-    if collection_cover_url:
+    cover_source = str(discogs_cfg.get("cover_source") or "shazam").strip().lower()
+    if cover_source == "discogs" and collection_cover_url:
         try:
             if collection_cover_url != (track.cover_url or ""):
                 track.cover_image = _load_discogs_cover(collection_cover_url).copy()

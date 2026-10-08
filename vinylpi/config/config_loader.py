@@ -72,6 +72,7 @@ CONFIG_DEFAULTS = {
         "enabled": False,
         "username": "",
         "prefer_collection": True,
+        "cover_source": "shazam",  # Preferred artwork for recognized vinyl tracks.
         "sequence_matching": True,
         "infer_unrecognized_next": True,
         "vinyl_only": True,
