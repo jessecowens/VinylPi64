@@ -3,19 +3,34 @@
 {% block title %}VinylPi Dashboard{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20260925b">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20261008a">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
 {% block page_scripts %}
     <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}?v=20260925b" defer></script>
-    <script src="{{ url_for('static', filename='js/pages/spotify_dashboard.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/spotify_dashboard.js') }}?v=20261008a" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/random_record.js') }}?v=20261008a" defer></script>
 {% endblock %}
 
 {% block content %}
 <main class="main">
     <header class="main-header">
-        <div class="header-title pixel-title">Dashboard</div>
+        <div class="dashboard-heading">
+            <div class="header-title pixel-title">Dashboard</div>
+            <button id="random-record-button" class="random-record-trigger" type="button"
+                    aria-label="Suggest a record" aria-haspopup="dialog" aria-controls="random-record-dialog"
+                    title="Checking playback source…" disabled>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="4"></rect>
+                    <g fill="currentColor" stroke="none">
+                        <circle cx="7.5" cy="7.5" r="1.3"></circle><circle cx="16.5" cy="7.5" r="1.3"></circle>
+                        <circle cx="12" cy="12" r="1.3"></circle>
+                        <circle cx="7.5" cy="16.5" r="1.3"></circle><circle cx="16.5" cy="16.5" r="1.3"></circle>
+                    </g>
+                </svg>
+            </button>
+        </div>
         {% include "components/profile_control.html" %}
     </header>
 
@@ -125,6 +140,38 @@
         </section>
     </section>
 </main>
+
+<dialog id="random-record-dialog" class="random-record-dialog" aria-labelledby="random-record-heading">
+    <div class="random-record-header">
+        <div>
+            <div class="eyebrow">Your collection</div>
+            <h2 id="random-record-heading">What should I play?</h2>
+        </div>
+        <button id="random-record-close" class="random-record-close" type="button" aria-label="Close record suggestion" autofocus>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="m6 6 12 12M18 6 6 18"></path>
+            </svg>
+        </button>
+    </div>
+    <div id="random-record-result" class="random-record-result hidden">
+        <div class="random-record-art">
+            <div id="random-record-placeholder" class="random-record-placeholder">
+                <svg viewBox="0 0 100 100" width="110" height="110" fill="none" stroke="currentColor" aria-hidden="true">
+                    <circle cx="50" cy="50" r="44" stroke-width="2"></circle>
+                    <circle cx="50" cy="50" r="34"></circle><circle cx="50" cy="50" r="27"></circle>
+                    <circle cx="50" cy="50" r="13" stroke-width="2"></circle><circle cx="50" cy="50" r="3" fill="currentColor"></circle>
+                </svg>
+                <span id="random-record-cover-status">Loading cover…</span>
+            </div>
+            <img id="random-record-cover" class="hidden" alt="">
+        </div>
+        <h3 id="random-record-title"></h3>
+        <p id="random-record-artist"></p>
+    </div>
+    <p id="random-record-message" class="random-record-message" role="status" aria-live="polite"></p>
+    <a id="random-record-settings" class="random-record-settings hidden" href="/settings.html#section-discogs">Open Discogs settings</a>
+    <button id="random-record-reroll" class="btn-primary random-record-reroll" type="button">Reroll</button>
+</dialog>
 
 <div id="info-backdrop" class="info-backdrop hidden"></div>
 

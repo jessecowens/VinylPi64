@@ -229,6 +229,28 @@ def get_collection_counts() -> dict[str, int]:
     return {"releases": int(row["releases"] or 0), "tracks": int(row["tracks"] or 0)}
 
 
+def get_random_release(exclude_release_id: int | None = None) -> dict[str, Any] | None:
+    """Pick from the current profile's collection, avoiding an immediate repeat.
+
+    The previous release sorts last, so a one-record collection still works.
+    Summaries are sufficient; a release need not have imported track details.
+    """
+    init_db()
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT release_id, title, artist,
+                COALESCE(NULLIF(cover_url, ''), thumb_url) AS cover_url,
+                (SELECT COUNT(*) FROM discogs_releases) AS collection_count
+            FROM discogs_releases
+            ORDER BY (release_id = ?), RANDOM()
+            LIMIT 1
+            """,
+            (exclude_release_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 _TRACK_SELECT = """
     SELECT
         t.release_id, t.track_index, t.position, t.side, t.title AS track_title,

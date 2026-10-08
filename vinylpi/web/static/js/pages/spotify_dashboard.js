@@ -99,6 +99,7 @@ function renderSpotifyConnection(spotify = {}) {
 function updateSourceUI(data = {}) {
     vinylPiSourceMode = ["off", "vinyl", "spotify"].includes(data.mode) ? data.mode : "off";
     vinylPiSourceBusyForViewer = Boolean(data.busy_for_viewer);
+    document.dispatchEvent(new CustomEvent("vinylpi:source-change", { detail: { mode: vinylPiSourceMode } }));
 
     document.querySelectorAll("[data-source-mode]").forEach((button) => {
         const active = button.dataset.sourceMode === vinylPiSourceMode;

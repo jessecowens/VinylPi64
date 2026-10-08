@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from vinylpi.config.runtime import read_config, write_config
-from vinylpi.core.discogs_db import get_release_tracks
+from vinylpi.core.discogs_db import get_random_release, get_release_tracks
 from vinylpi.core.discogs_service import (
     DISCOGS_TOKEN_ENV,
     SYNC_MANAGER,
     get_discogs_token,
 )
 from vinylpi.integrations.discogs_client import DiscogsClient, DiscogsError
+from vinylpi.web.services.source import get_mode
 
 
 discogs_bp = Blueprint("discogs_api", __name__)
@@ -27,6 +28,25 @@ def _missing_token_response():
 @discogs_bp.get("/api/discogs/status")
 def api_discogs_status():
     return jsonify({"ok": True, **SYNC_MANAGER.status()})
+
+
+@discogs_bp.get("/api/discogs/random")
+def api_discogs_random():
+    if get_mode() == "spotify":
+        return jsonify({"ok": False, "error": "Switch to Vinyl or Off to choose a record."}), 409
+
+    previous = request.args.get("exclude_release_id")
+    try:
+        previous_id = int(previous) if previous is not None else None
+        if previous_id is not None and not 1 <= previous_id <= 9223372036854775807:
+            raise ValueError
+    except ValueError:
+        return jsonify({"ok": False, "error": "Invalid release ID."}), 400
+
+    # Selection is entirely local and uses the browser's current profile.
+    response = jsonify({"ok": True, "release": get_random_release(previous_id)})
+    response.cache_control.no_store = True
+    return response
 
 
 @discogs_bp.get("/api/discogs/releases/<int:release_id>/tracklist")

@@ -45,6 +45,7 @@ class WebPageStructureTests(unittest.TestCase):
             "/static/css/base.css",
             "/static/css/pages/dashboard.css",
             "/static/js/pages/dashboard.js",
+            "/static/js/pages/random_record.js",
             "/static/js/profile.js",
             "/static/images/logo.png",
             "/assets/readme/Logo.png",
@@ -102,6 +103,16 @@ class WebPageStructureTests(unittest.TestCase):
         self.assertIn('id="discogs-add-link"', html)
         self.assertIn('Add to Discogs', html)
         self.assertIn('target="_blank"', html)
+
+
+    def test_dashboard_contains_random_record_dialog(self):
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn('id="random-record-button"', html)
+        self.assertIn('<dialog id="random-record-dialog"', html)
+        self.assertIn('aria-labelledby="random-record-heading"', html)
+        self.assertIn('id="random-record-cover"', html)
+        self.assertIn('id="random-record-reroll"', html)
+        self.assertIn('aria-label="Close record suggestion"', html)
 
 
     def test_dashboard_contains_expandable_discogs_tracklist(self):
