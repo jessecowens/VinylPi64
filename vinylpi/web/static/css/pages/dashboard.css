@@ -218,6 +218,7 @@
 
 /* Random record picker */
 .dashboard-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.dashboard-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
 .random-record-trigger, .random-record-close {
     display: inline-flex;
     align-items: center;
