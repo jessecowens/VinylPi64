@@ -6,13 +6,16 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from vinylpi.config.runtime import read_config
 from vinylpi.core.display_layout import normalize_image_config
+from vinylpi.integrations.discogs_client import USER_AGENT
 
 def load_image(path_or_url: str) -> Image.Image:
     if not path_or_url:
         raise ValueError("load_image: path_or_url is None or empty")
 
     if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
-        resp = requests.get(path_or_url, timeout=15)
+        # Artwork downloads do not use the Discogs API session. Identify the
+        # application here too, without forwarding API credentials to image hosts.
+        resp = requests.get(path_or_url, headers={"User-Agent": USER_AGENT}, timeout=15)
         resp.raise_for_status()
         img = Image.open(BytesIO(resp.content))
     else:
