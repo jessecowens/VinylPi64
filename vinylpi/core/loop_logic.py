@@ -138,6 +138,7 @@ def _song_info(track: RecognizedTrack, canonical_title: str, score: int) -> dict
     return {
         "artist": track.artist,
         "title": canonical_title,
+        "display_title": (track.title or "").strip() or canonical_title,
         "album": track.album,
         "cover_url": track.cover_url,
         "genre": track.genre,
@@ -214,7 +215,9 @@ def handle_song_result(
         is_same_song=is_same_song,
     )
 
-    start_scrolling_display(track.cover_image, track.artist, canonical_title, track.album)
+    # Display the original Shazam spelling. Keep a canonical title only
+    # for repeat detection and existing statistics keys.
+    start_scrolling_display(track.cover_image, track.artist, info["display_title"], track.album)
     bg_color = None
     try:
         rgb = dynamic_bg_color(track.cover_image)
@@ -230,7 +233,7 @@ def handle_song_result(
     disp.last_display_was_inferred = track.discogs_match_source == "sequence_inferred"
     write_status(
         track.artist,
-        canonical_title,
+        info["display_title"],
         cover_url=track.cover_url,
         album=track.album,
         genre=track.genre,

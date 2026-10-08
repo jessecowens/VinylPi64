@@ -73,6 +73,20 @@ class DiscogsArtworkTests(unittest.TestCase):
         )
 
     @patch("vinylpi.core.image_utils.requests.get")
+    def test_discogs_artwork_option_does_not_override_shazam_text(self, get):
+        data = BytesIO()
+        Image.new("RGB", (2, 2), "blue").save(data, format="PNG")
+        get.return_value = Mock(content=data.getvalue())
+        self.track.artist = "ARTIST"
+        self.track.title = "SoNg"
+        self.track.album = "aLbUm"
+
+        result = self.apply_match(cover_source="discogs")
+        self.assertEqual((result.artist, result.title, result.album), ("ARTIST", "SoNg", "aLbUm"))
+        self.assertEqual(result.discogs_release_id, 123)
+        self.assertEqual(result.cover_url, self.url)
+
+    @patch("vinylpi.core.image_utils.requests.get")
     def test_403_keeps_shazam_artwork_and_does_not_cache_failure(self, get):
         get.return_value.raise_for_status.side_effect = requests.HTTPError("403 Forbidden")
         for _ in range(2):

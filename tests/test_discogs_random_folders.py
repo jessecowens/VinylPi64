@@ -40,7 +40,7 @@ class DiscogsRandomFolderDatabaseTests(unittest.TestCase):
             "release_id": release_id,
             "folder_id": folder_id,
             "title": f"Album {release_id}",
-            "artist": "Smiths; The",
+            "artist": "Horizons; The",
         })
 
     def test_empty_collection_has_all_option(self):

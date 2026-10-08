@@ -17,10 +17,9 @@ _SORTED_ARTICLE = re.compile(
 
 
 def display_artist_name(value: str | None) -> str:
-    """Convert legacy Discogs sort names ("Smiths; The") to display names.
+    """Make a Discogs-only display name readable if the API supplies a sort name.
 
-    No database migration is needed: older releases and tracks are normalized
-    as they are read. Unrelated artist names remain untouched.
+    This helper is not applied to Shazam artist fields or to stored metadata.
     """
     name = (value or "").strip()
     match = _SORTED_ARTICLE.fullmatch(name)
@@ -72,7 +71,7 @@ def upsert_release_summary(data: dict[str, Any]) -> None:
                 data.get("instance_id"),
                 data.get("folder_id"),
                 data.get("title") or "Unknown release",
-                display_artist_name(data.get("artist")) or "Unknown artist",
+                data.get("artist") or "Unknown artist",
                 data.get("year"),
                 data.get("country"),
                 data.get("label"),
@@ -120,7 +119,7 @@ def replace_release_details(release: dict[str, Any], tracks: Iterable[dict[str, 
                 release.get("instance_id"),
                 release.get("folder_id"),
                 release.get("title") or "Unknown release",
-                display_artist_name(release.get("artist")) or "Unknown artist",
+                release.get("artist") or "Unknown artist",
                 release.get("year"),
                 release.get("country"),
                 release.get("label"),
@@ -147,7 +146,7 @@ def replace_release_details(release: dict[str, Any], tracks: Iterable[dict[str, 
                     track.get("position"),
                     track.get("side"),
                     track.get("title") or "Unknown track",
-                    display_artist_name(track.get("artist") or release.get("artist")) or "Unknown artist",
+                    track.get("artist") or release.get("artist") or "Unknown artist",
                     track.get("duration_seconds"),
                     normalize_text(canonicalize_title(track.get("title") or "")),
                     normalize_artist(track.get("artist") or release.get("artist")),
@@ -357,12 +356,10 @@ def get_random_release(
 
 
 def _track_row(row: Any) -> dict[str, Any]:
-    """Return artist names in display order, including pre-fix cached rows."""
+    """Keep Discogs metadata intact; derive a consistent comparison key."""
     result = dict(row)
-    result["track_artist"] = display_artist_name(result.get("track_artist"))
-    result["release_artist"] = display_artist_name(result.get("release_artist"))
-    # Old DBs also hold an obsolete normalized_artist ('smiths the'). Derive
-    # it from the display name so matching stays correct without a resync.
+    # Some older collection databases contain a stale comparison key. Derive
+    # it from the raw artist to match without requiring another sync.
     result["normalized_artist"] = normalize_artist(
         result.get("track_artist") or result.get("release_artist")
     )

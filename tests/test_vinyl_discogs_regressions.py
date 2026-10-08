@@ -1,4 +1,4 @@
-"""Regression tests for album locking, Shazam failures and Discogs artist order."""
+"""Regression tests for album identity, recognition failures, and metadata ownership."""
 from __future__ import annotations
 
 from contextlib import ExitStack
@@ -30,30 +30,30 @@ from vinylpi.core.title_variants import normalize_album_name
 
 class AlbumLockRegressionTests(unittest.TestCase):
     def test_album_identity_ignores_capitalization_and_surrounding_spaces(self):
-        self.assertEqual(normalize_album_name(" Hatful Of Hollow  "), "hatful of hollow")
+        self.assertEqual(normalize_album_name(" Echoes At Dawn  "), "echoes at dawn")
         self.assertFalse(should_ignore_live_album_mismatch(
-            "Still Ill (John Peel Session 9/14/83)", "Hatful of Hollow", "Hatful Of Hollow",
+            "Opening Track (Radio Session)", "Echoes at Dawn", "Echoes At Dawn",
         ))
         self.assertFalse(should_ignore_live_album_mismatch(
-            "Still Ill (John Peel Session 9/14/83)", "  HATFUL OF HOLLOW ", "Hatful of Hollow",
+            "Opening Track (Radio Session)", "  ECHOES AT DAWN ", "Echoes at Dawn",
         ))
         self.assertTrue(should_ignore_live_album_mismatch(
-            "Still Ill (John Peel Session 9/14/83)", "Some Other Album", "Hatful Of Hollow",
+            "Opening Track (Radio Session)", "Some Other Album", "Echoes At Dawn",
         ))
         self.assertFalse(should_ignore_live_album_mismatch(
-            "Ordinary Song", "Other Album", "Hatful Of Hollow",
+            "Ordinary Song", "Other Album", "Echoes At Dawn",
         ))
 
     @patch("vinylpi.core.loop_logic._increment_album_session")
     def test_album_session_and_candidate_are_case_insensitive(self, increment):
         st = AlbumState()
-        for title, album in (("One", "Hatful Of Hollow"), ("Two", "hatful of hollow")):
+        for title, album in (("One", "Echoes At Dawn"), ("Two", "echoes at dawn")):
             update_album_session_on_switch(
                 st=st, album=album, title=title, min_tracks=2, min_consecutive=2,
             )
-        self.assertEqual(st.current_album, "Hatful Of Hollow")
+        self.assertEqual(st.current_album, "Echoes At Dawn")
         self.assertTrue(st.current_album_session_counted)
-        increment.assert_called_once_with("Hatful Of Hollow")
+        increment.assert_called_once_with("Echoes At Dawn")
         update_album_session_on_switch(st=st, album="Another", title="Three", min_tracks=2, min_consecutive=2)
         self.assertEqual(st.candidate_streak, 1)
         update_album_session_on_switch(st=st, album="ANOTHER", title="Three", min_tracks=2, min_consecutive=2)
@@ -61,7 +61,7 @@ class AlbumLockRegressionTests(unittest.TestCase):
         self.assertIsNone(st.candidate_album)
         increment.assert_called_once()
 
-    def test_successful_shazam_still_ill_never_generates_fallback_or_side_flip(self):
+    def test_successful_shazam_session_track_never_generates_fallback_or_side_flip(self):
         # main_loop itself is exercised (rather than only its pure helper).
         # Stub Raspberry-Pi-specific optional modules when running on a host.
         originally = set(sys.modules)
@@ -74,10 +74,10 @@ class AlbumLockRegressionTests(unittest.TestCase):
         ) if key not in originally])
 
         display = DisplayState(consecutive_failures=19)
-        album = AlbumState(current_album="Hatful Of Hollow", current_album_session_counted=True)
+        album = AlbumState(current_album="Echoes At Dawn", current_album_session_counted=True)
         track = RecognizedTrack(
-            artist="The Smiths", title="Still Ill (John Peel Session 9/14/83)",
-            album="Hatful of Hollow", cover_url="https://example.test/art.jpg",
+            artist="The Horizons", title="Opening Track (Radio Session)",
+            album="Echoes at Dawn", cover_url="https://example.test/art.jpg",
             cover_image=Image.new("RGB", (4, 4), "blue"),
         )
         pickup = MagicMock()
@@ -125,7 +125,7 @@ class AlbumLockRegressionTests(unittest.TestCase):
                 side_flip.assert_not_called()
                 fallback.assert_not_called()
                 pixoo.assert_called_once()
-                self.assertEqual(status.call_args.args[0], "The Smiths")
+                self.assertEqual(status.call_args.args[0], "The Horizons")
 
     def test_rejected_actual_live_variant_does_not_trigger_fallback(self):
         originally = set(sys.modules)
@@ -136,9 +136,9 @@ class AlbumLockRegressionTests(unittest.TestCase):
             "vinylpi.core.recognition", "vinylpi.integrations.shazam_client",
         ) if key not in originally])
         display = DisplayState(consecutive_failures=19)
-        album = AlbumState(current_album="Hatful Of Hollow", current_album_session_counted=True)
+        album = AlbumState(current_album="Echoes At Dawn", current_album_session_counted=True)
         track = RecognizedTrack(
-            artist="The Smiths", title="Still Ill (John Peel Session 9/14/83)",
+            artist="The Horizons", title="Opening Track (Radio Session)",
             album="Different Live Album", cover_url="https://example.test/art.jpg",
             cover_image=Image.new("RGB", (4, 4), "blue"),
         )
@@ -177,35 +177,35 @@ class AlbumLockRegressionTests(unittest.TestCase):
 class DiscogsArtistRegressionTests(unittest.TestCase):
     def test_article_sort_forms_and_matching_names(self):
         for raw, expected in (
-            ("Smiths, The", "The Smiths"), ("Smiths; The", "The Smiths"),
-            ("Beatles, The", "The Beatles"), ("Smiths; The (2)", "The Smiths (2)"),
-            ("The Smiths", "The Smiths"),
-            ("Siouxsie and the Banshees", "Siouxsie and the Banshees"),
+            ("Horizons, The", "The Horizons"), ("Horizons; The", "The Horizons"),
+            ("Wanderers, The", "The Wanderers"), ("Horizons; The (2)", "The Horizons (2)"),
+            ("The Horizons", "The Horizons"),
+            ("Ancient Signals", "Ancient Signals"),
         ):
             with self.subTest(raw=raw):
                 self.assertEqual(display_artist_name(raw), expected)
-        self.assertEqual(normalize_artist("Smiths; The"), normalize_artist("The Smiths"))
-        self.assertEqual(normalize_artist("Smiths; The (2)"), normalize_artist("The Smiths"))
+        self.assertEqual(normalize_artist("Horizons; The"), normalize_artist("The Horizons"))
+        self.assertEqual(normalize_artist("Horizons; The (2)"), normalize_artist("The Horizons"))
 
     def test_sync_prefers_regular_artist_objects_over_sort_name(self):
         summary = collection_summary({
             "id": 10,
             "basic_information": {
-                "title": "Hatful Of Hollow", "artists_sort": "Smiths, The",
-                "artists": [{"name": "The Smiths"}],
+                "title": "Echoes At Dawn", "artists_sort": "Horizons, The",
+                "artists": [{"name": "The Horizons"}],
             },
         })
-        self.assertEqual(summary["artist"], "The Smiths")
+        self.assertEqual(summary["artist"], "The Horizons")
         release, tracks = parse_release_details({
-            "title": "Hatful Of Hollow", "artists_sort": "Smiths; The",
-            "artists": [{"name": "The Smiths"}],
+            "title": "Echoes At Dawn", "artists_sort": "Horizons; The",
+            "artists": [{"name": "The Horizons"}],
             "tracklist": [
-                {"title": "Still Ill", "position": "B1", "artists_sort": "Smiths, The"},
-                {"title": "This Charming Man", "position": "B2", "artists_sort": "Beatles, The", "artists": [{"name": "The Smiths"}]},
+                {"title": "Opening Track", "position": "B1", "artists_sort": "Horizons, The"},
+                {"title": "Second Track", "position": "B2", "artists_sort": "Wanderers, The", "artists": [{"name": "The Horizons"}]},
             ],
         }, summary)
-        self.assertEqual(release["artist"], "The Smiths")
-        self.assertEqual([t["artist"] for t in tracks], ["The Smiths", "The Smiths"])
+        self.assertEqual(release["artist"], "The Horizons")
+        self.assertEqual([t["artist"] for t in tracks], ["The Horizons", "The Horizons"])
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -215,52 +215,74 @@ class DiscogsArtistRegressionTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.addCleanup(database._INITIALIZED_PATHS.clear)
 
-    def test_legacy_cached_discogs_artist_names_are_display_normalized(self):
+    def test_missing_shazam_album_may_use_matched_release_as_fallback(self):
+        release = {"release_id": 44, "title": "Evening Echoes", "artist": "The Horizons"}
+        upsert_release_summary(release)
+        replace_release_details(release, [
+            {"track_index": 0, "title": "First Signal", "artist": "Horizons; The", "position": "A1"},
+        ])
+        track = RecognizedTrack(
+            artist="The Horizons", title="First Signal", album=None,
+            cover_image=Image.new("RGB", (2, 2)), cover_url="https://example.test/shazam.png",
+        )
+        matched = apply_discogs_match(track, DiscogsPlaybackState(), {"discogs": {"enabled": True}})
+        self.assertEqual(matched.artist, "The Horizons")
+        self.assertEqual(matched.title, "First Signal")
+        self.assertEqual(matched.album, "Evening Echoes")
+        self.assertEqual(matched.discogs_release_id, 44)
+
+    def test_legacy_discogs_sort_names_are_comparison_only(self):
         release = {
-            "release_id": 12, "title": "Hatful Of Hollow", "artist": "The Smiths",
+            "release_id": 12, "title": "Echoes At Dawn", "artist": "The Horizons",
             "cover_url": "https://example.test/cover.jpg",
         }
         upsert_release_summary(release)
         replace_release_details(release, [
-            {"track_index": 0, "title": "Still Ill", "artist": "The Smiths", "position": "B2", "side": "B"},
-            {"track_index": 1, "title": "This Charming Man", "artist": "The Smiths", "position": "B3", "side": "B"},
+            {"track_index": 0, "title": "Opening Track", "artist": "The Horizons", "position": "B2", "side": "B"},
+            {"track_index": 1, "title": "Second Track", "artist": "The Horizons", "position": "B3", "side": "B"},
         ])
         # Simulate collection already synchronized by a previous VinylPi version.
         with database.get_connection() as conn:
-            conn.execute("UPDATE discogs_releases SET artist = 'Smiths; The'")
-            conn.execute("UPDATE discogs_tracks SET artist = 'Smiths, The', normalized_artist = 'smiths the'")
+            conn.execute("UPDATE discogs_releases SET artist = 'Horizons; The'")
+            conn.execute("UPDATE discogs_tracks SET artist = 'Horizons, The', normalized_artist = 'horizons the'")
 
         random_record = get_random_release()
-        self.assertEqual(random_record["artist"], "The Smiths")
+        self.assertEqual(random_record["artist"], "The Horizons")
         tracks = get_release_tracks(12)
-        self.assertEqual(tracks[0]["track_artist"], "The Smiths")
-        self.assertEqual(tracks[0]["release_artist"], "The Smiths")
-        self.assertEqual(tracks[0]["normalized_artist"], "the smiths")
-        self.assertEqual(get_next_track(12, 0)["track_artist"], "The Smiths")
-        self.assertEqual(find_exact_title_tracks("still ill")[0]["track_artist"], "The Smiths")
+        # Stored Discogs names are retained as-is, including old sort forms.
+        # Only the comparison key is normalized for reliable matching.
+        self.assertEqual(tracks[0]["track_artist"], "Horizons, The")
+        self.assertEqual(tracks[0]["release_artist"], "Horizons; The")
+        self.assertEqual(tracks[0]["normalized_artist"], "the horizons")
+        self.assertEqual(get_next_track(12, 0)["track_artist"], "Horizons, The")
+        self.assertEqual(find_exact_title_tracks("opening track")[0]["track_artist"], "Horizons, The")
 
         recognized = RecognizedTrack(
-            artist="The Smiths", title="Still Ill", album="Hatful of Hollow",
+            artist="THE Horizons", title="Opening TRACK", album="Echoes at dawn",
             cover_image=Image.new("RGB", (2, 2), "blue"), cover_url="https://example.test/shazam.png",
         )
         matched = apply_discogs_match(
             recognized, DiscogsPlaybackState(),
             {"discogs": {"enabled": True, "prefer_collection": True}},
         )
-        self.assertEqual(matched.artist, "The Smiths")
-        self.assertEqual(matched.discogs_expected_next_artist, "The Smiths")
+        self.assertEqual(matched.artist, "THE Horizons")
+        self.assertEqual(matched.title, "Opening TRACK")
+        self.assertEqual(matched.album, "Echoes at dawn")
+        self.assertEqual(matched.discogs_expected_next_artist, "The Horizons")
         self.assertEqual(matched.cover_url, "https://example.test/shazam.png")
         self.assertEqual(matched.discogs_release_id, 12)
         self.assertEqual(matched.discogs_confidence, 1.0)
 
-        # Both Pixoo and dashboard/status must receive the corrected artist,
-        # not just the matcher result.
+        # Both Pixoo and dashboard/status must receive the Shazam values,
+        # not the Discogs sort form or the canonical statistics title.
         with patch("vinylpi.core.loop_logic.start_scrolling_display") as pixoo, \
              patch("vinylpi.core.loop_logic.write_status") as status, \
              patch("vinylpi.core.loop_logic.send_rgb"):
             handle_song_result(LoopConfig(), DisplayState(), False, matched)
-        self.assertEqual(pixoo.call_args.args[1], "The Smiths")
-        self.assertEqual(status.call_args.args[0], "The Smiths")
+        self.assertEqual(pixoo.call_args.args[1:4], ("THE Horizons", "Opening TRACK", "Echoes at dawn"))
+        self.assertEqual(status.call_args.args[0:2], ("THE Horizons", "Opening TRACK"))
+        self.assertEqual(status.call_args.kwargs["album"], "Echoes at dawn")
+        self.assertEqual(status.call_args.kwargs["discogs_release_id"], 12)
 
         playback = DiscogsPlaybackState(
             active_release_id=12, current_track_index=0, current_side="B",
@@ -271,7 +293,7 @@ class DiscogsArtistRegressionTests(unittest.TestCase):
                 playback, {"discogs": {"enabled": True}}, consecutive_failures=2,
             )
         self.assertIsNotNone(inferred)
-        self.assertEqual(inferred.artist, "The Smiths")
+        self.assertEqual(inferred.artist, "The Horizons")
         self.assertEqual(inferred.discogs_release_id, 12)
 
 

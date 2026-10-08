@@ -52,10 +52,8 @@ def _base_title_norm(value: str | None) -> str:
 def _lead_title_norm(value: str | None) -> str:
     """Return the leading title segment used by some Shazam false positives.
 
-    A recurring pattern is a recognition like ``five degrees / cut (...)`` for
-    the actual vinyl track ``five degrees``.  The leading segment is useful as
-    supporting evidence, but only becomes decisive when the Discogs sequence
-    already points to that exact track.
+    This segment is supporting evidence only; the active Discogs sequence
+    must also agree before treating it as decisive.
     """
     title = canonicalize_title(value or "")
     return normalize_text(_TITLE_SEGMENT_SPLIT.split(title, maxsplit=1)[0])
@@ -134,8 +132,8 @@ def _score_candidate(
     )
     if compact_equivalent or lead_equivalent:
         title_similarity = 1.0
-    # Recompute from the artist name: legacy local DBs may have stored
-    # 'smiths the' as normalized_artist, whereas new rows use 'the smiths'.
+    # Normalize on lookup: previously synced rows may have an outdated
+    # normalized_artist value. Never use a sort key as the displayed artist.
     candidate_artist = candidate.get("track_artist") or candidate.get("release_artist")
     artist_similarity = _similarity(
         artist_norm,
@@ -306,15 +304,13 @@ def apply_discogs_match(
     for candidate in find_exact_title_tracks(title_norm):
         candidates[_candidate_key(candidate)] = candidate
 
-    # Discogs/Shazam sometimes differ only in whitespace ("high school" vs
-    # "highschool"). Include those collection candidates before falling back to
-    # sequence context so the very first track can already lock the release.
+    # Include titles that differ only in spacing before trying the
+    # currently active release's track sequence.
     for candidate in find_compact_title_tracks(title_norm):
         candidates[_candidate_key(candidate)] = candidate
 
-    # Shazam often appends version information to the title while Discogs stores
-    # the plain track title and the version on the release, e.g.
-    # "Nutshell (Unplugged)" on "MTV Unplugged".
+    # Shazam may append version information to a track title while Discogs
+    # puts that information on the release instead.
     if base_title_norm and base_title_norm != title_norm:
         for candidate in find_exact_title_tracks(base_title_norm):
             candidates[_candidate_key(candidate)] = candidate
@@ -370,9 +366,12 @@ def apply_discogs_match(
     )
     original = f"{track.artist} – {track.title} [{track.album or '-'}]"
 
-    track.artist = display_artist_name(best.get("track_artist") or best.get("release_artist") or track.artist)
-    track.title = str(best.get("track_title") or track.title)
-    track.album = str(best.get("release_title") or track.album or "") or None
+    # Shazam supplies the public artist, title and album. Discogs only
+    # establishes collection membership, vinyl position and release metadata.
+    # If Shazam supplied no album at all, fill the missing field from the
+    # matched release so album/session tracking can still work.
+    if not (track.album or "").strip():
+        track.album = str(best.get("release_title") or "").strip() or None
     if not track.duration_ms and best.get("duration_seconds"):
         track.duration_ms = int(best["duration_seconds"]) * 1000
 
@@ -400,8 +399,8 @@ def apply_discogs_match(
         track.discogs_expected_next_position = next_track.get("position")
         track.discogs_expected_next_side = next_track.get("side")
 
-    # Discogs provides authoritative release metadata regardless of the cover
-    # preference. Shazam artwork is the default; Discogs artwork is opt-in.
+    # Artwork preference is independent of matching and public metadata.
+    # Shazam artwork is the default; Discogs artwork is opt-in.
     # Download failures never replace the already available Shazam image.
     collection_cover_url = str(best.get("cover_url") or "").strip()
     cover_source = str(discogs_cfg.get("cover_source") or "shazam").strip().lower()
@@ -415,12 +414,12 @@ def apply_discogs_match(
                 print(f"Discogs: could not load collection cover, keeping Shazam image: {exc}")
 
     if debug_log:
-        corrected = f"{track.artist} – {track.title} [{track.album or '-'}]"
         version_note = " version-aware" if metrics.get("variant_overlap") else ""
         print(
             f"Discogs {source}{version_note} match "
             f"({confidence:.0%}, {best.get('position') or '?'}): "
-            f"{original} -> {corrected}"
+            f"{original} [release #{release_id}, track {best.get('position') or '?'}]; "
+            "keeping Shazam metadata"
         )
     return track
 

@@ -40,8 +40,7 @@ def get_discogs_token(cfg: dict[str, Any] | None = None) -> str:
 
 
 def _artist_name(value: dict[str, Any]) -> str:
-    name = str(value.get("name") or "").strip()
-    return display_artist_name(name)
+    return str(value.get("name") or "").strip()
 
 
 def _join_artists(values: Any, fallback: str = "Unknown artist") -> str:
